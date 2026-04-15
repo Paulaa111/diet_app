@@ -124,7 +124,6 @@ if submitted and food_input and api_key:
             data = get_nutrition_ai(food_input, api_key)
             new_row = [get_polish_day(), today_str, meal_time, data['name'], data['kcal'], data['p'], data['f'], data['c']]
             sheet.append_row(new_row)
-            st.write("Próba zapisu...") # To pokaże, czy kod w ogóle dochodzi do tego miejsca
             st.rerun()
     except Exception as e:
         st.error(f"Błąd: {e}")
