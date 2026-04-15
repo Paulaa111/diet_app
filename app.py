@@ -96,7 +96,7 @@ with st.sidebar:
 
 # --- UI ---
 st.markdown('<div class="main-title">🍽️ Licznik Kalorii Agnieszki</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Wpisz co zjadłeś — podzielone na posiłki</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Wpisz co zjadłaś — podzielone na posiłki</div>', unsafe_allow_html=True)
 
 total = sum(m["calories"] for m in st.session_state.meals)
 remaining = LIMIT - total
