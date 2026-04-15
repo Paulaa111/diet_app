@@ -157,15 +157,25 @@ with st.form("meal_form", clear_on_submit=True):
     submitted = st.form_submit_button("➕ Dodaj do listy", use_container_width=True)
 
 if submitted and food_input.strip():
-    if detect_bread(food_input):
-        grams = parse_bread_grams(food_input)
+    # Zmieniamy 'text' na 'food_input', żeby Python wiedział o co chodzi
+    input_to_process = food_input.strip() 
+
+    if detect_bread(input_to_process):
+        grams = parse_bread_grams(input_to_process)
         kcal = round(BREAD_KCAL_PER_100G * grams / 100)
-        st.session_state.meals.append({"name": f"🍞 Chleb własny ({grams}g)", "calories": kcal, "time": meal_time})
+        st.session_state.meals.append({
+            "name": f"🍞 Chleb własny ({grams}g)", 
+            "calories": kcal, 
+            "time": meal_time
+        })
         st.rerun()
-    elif api_key:
+    elif not api_key:
+        st.warning("⚠️ Brak klucza Groq API!")
+    else:
         with st.spinner("🤔 Groq liczy kalorie..."):
             try:
-                result = get_calories_groq(text, api_key)
+                # Tutaj też zmieniamy 'text' na 'input_to_process'
+                result = get_calories_groq(input_to_process, api_key)
                 st.session_state.meals.append({
                     "name": result["name"],
                     "calories": int(result["calories"]),
@@ -173,4 +183,4 @@ if submitted and food_input.strip():
                 })
                 st.rerun()
             except Exception as e:
-                st.error(f"Błąd: {e}") # Ta linia MUSI być wcięta względem except
+                st.error(f"Błąd: {e}")
