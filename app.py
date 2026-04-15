@@ -4,114 +4,113 @@ from datetime import date
 
 # --- Konfiguracja strony ---
 st.set_page_config(
-    page_title="Licznik Kalorii",
-    page_icon="🍏",
+    page_title="Mój Dziennik Jedzenia",
+    page_icon="🥑",
     layout="centered",
 )
 
-# --- NOWOCZESNY JASNY CSS ---
+# --- STYL ORGANICZNY (Ciepłe beże, zieleń szałwiowa) ---
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Plus+Jakarta+Sans:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
 
-/* Główny background - jasny, świeży gradient */
+/* Tło w kolorze ciepłego piasku/kremu */
 .stApp {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    color: #2d3748;
+    background-color: #fdfaf5;
+    color: #4a4a4a;
 }
 
-/* Czcionki */
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; }
+/* Czcionka bardziej zaokrąglona i przyjazna */
+html, body, [class*="css"] { font-family: 'Quicksand', sans-serif; }
 
-/* Tytuł */
+/* Nagłówek w kolorze oliwkowym/szałwiowym */
 .main-title {
-    font-size: 3rem;
-    font-weight: 800;
-    background: linear-gradient(90deg, #2b6cb0, #4299e1);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #6b8e23;
     text-align: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.2rem;
 }
 
 .subtitle {
     text-align: center;
-    color: #718096;
-    font-size: 1rem;
-    margin-bottom: 2.5rem;
+    color: #8c7b6c;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
 }
 
-/* Karty Statystyk - Glassmorphism */
+/* Statystyki - ciepłe, papierowe karty */
 .stat-box {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 20px;
+    background: #ffffff;
+    border-radius: 15px;
     padding: 20px;
     text-align: center;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 15px rgba(139, 123, 108, 0.1);
+    border-bottom: 4px solid #e0d7cd;
 }
 
 .stat-value {
-    font-size: 2.2rem;
-    font-weight: 800;
-    color: #2b6cb0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #8b7b6c;
 }
 
 .stat-label {
-    font-size: 0.75rem;
-    color: #a0aec0;
+    font-size: 0.8rem;
+    color: #a69080;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-top: 5px;
+    font-weight: 600;
 }
 
-/* Posiłki */
+/* Posiłki - zielone akcenty */
 .section-header {
-    color: #2d3748;
-    font-size: 1.2rem;
+    color: #6b8e23;
+    font-size: 1.3rem;
     font-weight: 700;
-    margin-top: 25px;
-    padding-left: 5px;
-    border-left: 4px solid #4299e1;
-    margin-bottom: 10px;
+    margin-top: 30px;
+    border-bottom: 2px solid #e9e2d8;
+    padding-bottom: 5px;
 }
 
 .meal-card {
     background: white;
-    border-radius: 15px;
-    padding: 12px 20px;
-    margin: 8px 0;
+    border-radius: 12px;
+    padding: 15px;
+    margin: 10px 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-    transition: transform 0.2s;
+    border: 1px solid #f0ede9;
 }
 
-.meal-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.05);
+.meal-name { color: #5d5d5d; font-weight: 600; }
+.meal-kcal { 
+    background: #f1f3eb;
+    color: #6b8e23;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-weight: 700;
 }
 
-.meal-name { color: #4a5568; font-weight: 500; }
-.meal-kcal { color: #2b6cb0; font-weight: 700; }
-
-/* Przycisk formy */
+/* Przyciski - terakota / ciepły brąz */
 div.stButton > button:first-child {
-    background: linear-gradient(90deg, #4299e1, #3182ce);
+    background-color: #d4a373;
     color: white;
     border: none;
-    border-radius: 12px;
-    padding: 10px 20px;
-    font-weight: 600;
-    box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
+    border-radius: 10px;
+    padding: 12px;
+    font-weight: 700;
+    transition: all 0.3s;
+}
+
+div.stButton > button:first-child:hover {
+    background-color: #bc8a5f;
+    transform: scale(1.02);
 }
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background-color: white;
+    background-color: #f7f3ed;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -166,25 +165,25 @@ with st.sidebar:
         api_key = st.text_input("Klucz Groq API", type="password")
 
 # --- UI GŁÓWNE ---
-st.markdown('<div class="main-title">🍏 Mój Licznik</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Lekkie i nowoczesne śledzenie kalorii</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🥑 Mój Dziennik</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Zdrowy styl życia krok po kroku</div>', unsafe_allow_html=True)
 
 total = sum(m["calories"] for m in st.session_state.meals)
 remaining = LIMIT - total
 
 col1, col2, col3 = st.columns(3)
-with col1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total}</div><div class="stat-label">Spożyte</div></div>', unsafe_allow_html=True)
+with col1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total}</div><div class="stat-label">Zjedzono</div></div>', unsafe_allow_html=True)
 with col2: 
-    color = "#48bb78" if remaining >= 0 else "#f56565"
-    st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:{color}">{remaining}</div><div class="stat-label">Pozostało</div></div>', unsafe_allow_html=True)
-with col3: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#718096">{LIMIT}</div><div class="stat-label">Limit</div></div>', unsafe_allow_html=True)
+    color = "#6b8e23" if remaining >= 0 else "#bc6c25"
+    st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:{color}">{remaining}</div><div class="stat-label">Zostało</div></div>', unsafe_allow_html=True)
+with col3: st.markdown(f'<div class="stat-box"><div class="stat-value">{LIMIT}</div><div class="stat-label">Cel</div></div>', unsafe_allow_html=True)
 
-st.write("") # Odstęp
+st.write("")
 
 with st.form("meal_form", clear_on_submit=True):
-    food_input = st.text_input("Co dziś jemy?", placeholder="Wpisz posiłek...")
-    meal_time = st.selectbox("Pora dnia", ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"])
-    submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
+    food_input = st.text_input("Co dobrego zjadłaś?", placeholder="np. sałatka z fetą...")
+    meal_time = st.selectbox("Pora posiłku", ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"])
+    submitted = st.form_submit_button("DODAJ DO DZIENNIKA", use_container_width=True)
 
 if submitted and food_input.strip():
     txt = food_input.strip()
@@ -200,7 +199,7 @@ if submitted and food_input.strip():
         st.session_state.meals.append(new_meal)
         st.rerun()
     except Exception as e:
-        st.error(f"Coś poszło nie tak: {e}")
+        st.error(f"Mały problem: {e}")
 
 # --- LISTA POSIŁKÓW ---
 if st.session_state.meals:
@@ -213,6 +212,6 @@ if st.session_state.meals:
                 st.markdown(f'<div class="meal-card"><span class="meal-name">{m["name"]}</span><span class="meal-kcal">{m["calories"]} kcal</span></div>', unsafe_allow_html=True)
     
     st.write("")
-    if st.button("Wyczyść dzisiejsze menu"):
+    if st.button("Zacznij nowy dzień"):
         st.session_state.meals = []
         st.rerun()
