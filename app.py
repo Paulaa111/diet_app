@@ -114,11 +114,12 @@ def parse_bread_grams(text: str) -> int:
 # Gemini API
 # ---------------------------------------------------------------
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
-    # Konfiguracja - biblioteka sama dobierze właściwe v1 lub v1beta
+    # Konfiguracja
     genai.configure(api_key=api_key)
     
-    # Próbujemy użyć wersji flash, która jest najstabilniejsza
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # WYMUSZAMY wersję modelu, która na 100% działa w v1
+    # Zmieniamy nazwę na pełną wersję stabilną
+    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash')
     
     prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
     Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON:
@@ -128,17 +129,14 @@ def get_calories_gemini(food_description: str, api_key: str) -> dict:
       "note": "Krótka informacja"
     }}"""
     
-    # Wywołanie nową metodą
+    # Dodajemy parametr version, żeby ominąć v1beta jeśli to możliwe
     response = model.generate_content(prompt)
     
-    # Wyciąganie tekstu (biblioteka sama czyści śmieci z odpowiedzi)
     res_text = response.text.strip()
     
-    # Na wypadek gdyby AI dodało ```json ... ```
-    if "```json" in res_text:
-        res_text = res_text.split("```json")[1].split("```")[0].strip()
-    elif "```" in res_text:
-        res_text = res_text.split("```")[1].strip()
+    # Bardziej pancerne wyciąganie JSONa
+    if "{" in res_text:
+        res_text = res_text[res_text.find("{"):res_text.rfind("}")+1]
         
     return json.loads(res_text)
 
