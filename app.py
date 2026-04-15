@@ -114,12 +114,12 @@ def parse_bread_grams(text: str) -> int:
 # Gemini API
 # ---------------------------------------------------------------
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
-    # Konfiguracja
-    genai.configure(api_key=api_key)
+    import requests
     
-    # WYMUSZAMY wersję modelu, która na 100% działa w v1
-    # Zmieniamy nazwę na pełną wersję stabilną
-    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash')
+    # Używamy wersji v1 (stabilnej) zamiast v1beta
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    headers = {'Content-Type': 'application/json'}
     
     prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
     Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON:
@@ -129,16 +129,33 @@ def get_calories_gemini(food_description: str, api_key: str) -> dict:
       "note": "Krótka informacja"
     }}"""
     
-    # Dodajemy parametr version, żeby ominąć v1beta jeśli to możliwe
-    response = model.generate_content(prompt)
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 200
+        }
+    }
     
-    res_text = response.text.strip()
+    response = requests.post(url, headers=headers, json=payload, timeout=15)
     
-    # Bardziej pancerne wyciąganie JSONa
-    if "{" in res_text:
-        res_text = res_text[res_text.find("{"):res_text.rfind("}")+1]
+    if response.status_code != 200:
+        # To nam powie dokładnie, co jest nie tak, jeśli znowu wyskoczy błąd
+        raise Exception(f"Błąd API ({response.status_code}): {response.text}")
         
-    return json.loads(res_text)
+    data = response.json()
+    
+    # Wyciąganie tekstu z odpowiedzi Google
+    try:
+        raw_text = data['candidates'][0]['content']['parts'][0]['text'].strip()
+        # Czyszczenie z markdownu (jeśli AI go doda)
+        if "{" in raw_text:
+            raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+        return json.loads(raw_text)
+    except (KeyError, IndexError, ValueError) as e:
+        raise Exception("AI zwróciło dane w złym formacie. Spróbuj ponownie.")
 
 # ---------------------------------------------------------------
 # Sesja
