@@ -1,6 +1,5 @@
 import streamlit as st
 import json
-import google.generativeai as genai # Dodaj ten import na górze kodu!
 from datetime import date
 
 # --- Konfiguracja strony ---
@@ -116,7 +115,7 @@ def parse_bread_grams(text: str) -> int:
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
     import requests
     
-    # Używamy wersji v1 (stabilnej) zamiast v1beta
+    # Stabilny endpoint v1
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     headers = {'Content-Type': 'application/json'}
@@ -142,19 +141,17 @@ def get_calories_gemini(food_description: str, api_key: str) -> dict:
     response = requests.post(url, headers=headers, json=payload, timeout=15)
     
     if response.status_code != 200:
-        # To nam powie dokładnie, co jest nie tak, jeśli znowu wyskoczy błąd
         raise Exception(f"Błąd API ({response.status_code}): {response.text}")
         
     data = response.json()
     
-    # Wyciąganie tekstu z odpowiedzi Google
     try:
         raw_text = data['candidates'][0]['content']['parts'][0]['text'].strip()
-        # Czyszczenie z markdownu (jeśli AI go doda)
+        # Wycinanie samego JSONa (na wszelki wypadek)
         if "{" in raw_text:
             raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
         return json.loads(raw_text)
-    except (KeyError, IndexError, ValueError) as e:
+    except (KeyError, IndexError, ValueError):
         raise Exception("AI zwróciło dane w złym formacie. Spróbuj ponownie.")
 
 # ---------------------------------------------------------------
