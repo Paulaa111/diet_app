@@ -115,30 +115,41 @@ def parse_bread_grams(text: str) -> int:
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
     import requests
     import json
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
     
-    # Używamy v1beta, ale z JEDNĄ, konkretną nazwą modelu
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
-    payload = {
-        "contents": [{
-            "parts": [{"text": f"Podaj kalorie dla: {food_description}. Odpowiedz tylko JSON: {{\"name\":\"...\", \"calories\": 100, \"note\":\"...\"}}"}]
-        }]
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
     
-    response = requests.post(url, json=payload, timeout=15)
+    prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał: "{food_description}".
+    Oszacuj kalorie i podaj dane w formacie JSON:
+    {{
+      "name": "Nazwa dania po polsku",
+      "calories": 100,
+      "note": "Krótka uwaga"
+    }}
+    Zwróć tylko i wyłącznie czysty JSON, bez żadnego wstępu."""
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=15)
     
     if response.status_code != 200:
-        raise Exception(f"Błąd Google ({response.status_code}). Prawdopodobnie musisz stworzyć NOWY klucz w NOWYM projekcie w AI Studio.")
-        
+        raise Exception(f"Błąd Groq ({response.status_code}): {response.text}")
+
     data = response.json()
-    raw_text = data['candidates'][0]['content']['parts'][0]['text'].strip()
+    res_text = data['choices'][0]['message']['content'].strip()
     
     # Wyciąganie JSON
-    if "{" in raw_text:
-        raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
-    
-    return json.loads(raw_text)
-
+    start = res_text.find('{')
+    end = res_text.rfind('}') + 1
+    return json.loads(res_text[start:end])
 # ---------------------------------------------------------------
 # Sesja
 # ---------------------------------------------------------------
