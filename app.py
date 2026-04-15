@@ -115,44 +115,31 @@ def parse_bread_grams(text: str) -> int:
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
     import requests
     
-    # Stabilny endpoint v1
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Próbujemy najpierw najnowszą nazwę, a jak nie wyjdzie, to alternatywną
+    model_names = ["gemini-1.5-flash", "gemini-pro"]
     
-    headers = {'Content-Type': 'application/json'}
-    
-    prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
-    Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON:
-    {{
-      "name": "Nazwa dania",
-      "calories": 100,
-      "note": "Krótka informacja"
-    }}"""
-    
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 200
-        }
-    }
-    
-    response = requests.post(url, headers=headers, json=payload, timeout=15)
-    
-    if response.status_code != 200:
-        raise Exception(f"Błąd API ({response.status_code}): {response.text}")
+    last_error = ""
+    for m_name in model_names:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
         
-    data = response.json()
-    
-    try:
-        raw_text = data['candidates'][0]['content']['parts'][0]['text'].strip()
-        # Wycinanie samego JSONa (na wszelki wypadek)
-        if "{" in raw_text:
-            raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
-        return json.loads(raw_text)
-    except (KeyError, IndexError, ValueError):
-        raise Exception("AI zwróciło dane w złym formacie. Spróbuj ponownie.")
+        payload = {
+            "contents": [{"parts": [{"text": f"Jesteś dietetykiem. Podaj kalorie dla: {food_description}. Odpowiedz tylko JSON: {{\"name\":\"...\", \"calories\": 100, \"note\":\"...\"}}"}]}]
+        }
+        
+        try:
+            resp = requests.post(url, json=payload, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw_text = data['candidates'][0]['content']['parts'][0]['text'].strip()
+                if "{" in raw_text:
+                    raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                return json.loads(raw_text)
+            else:
+                last_error = f"Model {m_name} błąd: {resp.text}"
+        except:
+            continue
+            
+    raise Exception(f"Żaden model nie odpowiedział. Ostatni błąd: {last_error}")
 
 # ---------------------------------------------------------------
 # Sesja
