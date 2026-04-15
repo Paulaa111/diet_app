@@ -153,7 +153,7 @@ def get_calories_groq(food_description: str, api_key: str) -> dict:
 if "meals" not in st.session_state:
     st.session_state.meals = []
 
-LIMIT = 2000
+LIMIT = 1500
 
 # --- Sidebar ---
 with st.sidebar:
