@@ -1,7 +1,6 @@
 import streamlit as st
 import json
-import requests
-import google.generativeai as genai  # Dodaj to
+import google.generativeai as genai # Dodaj ten import na górze kodu!
 from datetime import date
 
 # --- Konfiguracja strony ---
@@ -115,24 +114,29 @@ def parse_bread_grams(text: str) -> int:
 # Gemini API
 # ---------------------------------------------------------------
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
-    # Konfiguracja oficjalnego klienta
+    # Konfiguracja oficjalną biblioteką (rozwiązuje błąd 404)
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
-    Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON (bez markdown):
+    Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON:
     {{
       "name": "Przyjazna polska nazwa dania",
       "calories": <liczba całkowita>,
       "note": "Krótka uwaga o porcji"
     }}"""
     
+    # Wywołanie dedykowaną metodą
     response = model.generate_content(prompt)
     
-    # Wyciąganie tekstu i czyszczenie
-    res_text = response.text.strip()
-    res_text = res_text.replace("```json", "").replace("```", "").strip()
-    return json.loads(res_text)
+    # Pobranie tekstu i czyszczenie z ewentualnych znaczników ```json
+    raw_text = response.text.strip()
+    if "```json" in raw_text:
+        raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+    elif "```" in raw_text:
+        raw_text = raw_text.split("```")[1].strip()
+        
+    return json.loads(raw_text)
 
 # ---------------------------------------------------------------
 # Sesja
