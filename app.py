@@ -155,27 +155,22 @@ st.markdown('<div class="main-title">🍽️ Licznik Kalorii</div>', unsafe_allo
 st.markdown('<div class="subtitle">Wpisz co zjadłeś — AI policzy resztę</div>', unsafe_allow_html=True)
 
 # Sidebar
+# W sekcji Sidebar zamień st.text_input na to:
 with st.sidebar:
     st.markdown("### ⚙️ Ustawienia")
-    api_key = st.text_input(
-        "Klucz Gemini API",
-        type="password",
-        placeholder="AIza...",
-        help="Bezpłatny klucz: aistudio.google.com"
-    )
-    st.caption("🔒 Klucz nie jest nigdzie zapisywany.")
-    st.markdown("---")
-    st.markdown("### 🍞 Własny chleb")
-    st.markdown("""<div class="bread-info">
-        <b style="color:#f5c518">Chleb z otrębami i twarogiem</b><br>
-        <span style="color:#a0aec0">211 kcal / 100 g</span><br><br>
-        • 1 kromka (80g) = <b style="color:#f5c518">169 kcal</b><br>
-        • 1 plasterek (40g) = <b style="color:#f5c518">84 kcal</b><br><br>
-        <span style="color:#718096; font-size:0.78rem">Działa BEZ klucza API 🎉<br>
-        Wpisz np. "2 kromki chleba z otrębami"</span>
-    </div>""", unsafe_allow_html=True)
-    st.markdown("---")
-    st.markdown("**Limit dzienny:** 2 000 kcal")
+    
+    # Sprawdź czy klucz jest w Secrets, jeśli nie - pozwól wpisać ręcznie
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.success("✅ Klucz API wczytany z Secrets")
+    else:
+        api_key = st.text_input(
+            "Klucz Gemini API",
+            type="password",
+            placeholder="AIza...",
+            help="Wklej klucz lub dodaj go do secrets.toml"
+        )
+
 
 # Statystyki
 total = sum(m["calories"] for m in st.session_state.meals)
