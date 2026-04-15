@@ -4,7 +4,7 @@ from datetime import date
 
 # --- Konfiguracja strony ---
 st.set_page_config(
-    page_title="Licznik Kalorii",
+    page_title="Licznik Kalorii Agnieszki",
     page_icon="🍽️",
     layout="centered",
 )
