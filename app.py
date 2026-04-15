@@ -175,17 +175,11 @@ st.markdown('<div class="subtitle">Wpisz co zjadłeś — AI policzy resztę</di
 with st.sidebar:
     st.markdown("### ⚙️ Ustawienia")
     
-    # Sprawdź czy klucz jest w Secrets, jeśli nie - pozwól wpisać ręcznie
-    if "GEMINI_API_KEY" in st.secrets:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        st.success("✅ Klucz API wczytany z Secrets")
-    else:
-        api_key = st.text_input(
-            "Klucz Gemini API",
-            type="password",
-            placeholder="AIza...",
-            help="Wklej klucz lub dodaj go do secrets.toml"
-        )
+   if "GROQ_API_KEY" in st.secrets:
+    api_key = st.secrets["GROQ_API_KEY"]
+    st.success("✅ Klucz Groq wczytany")
+else:
+    api_key = st.text_input("Klucz Groq API", type="password")
 
 
 # Statystyki
