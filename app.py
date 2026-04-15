@@ -163,9 +163,14 @@ if submitted and food_input.strip():
         st.session_state.meals.append({"name": f"🍞 Chleb własny ({grams}g)", "calories": kcal, "time": meal_time})
         st.rerun()
     elif api_key:
-        with st.spinner("Liczenie..."):
+        with st.spinner("🤔 Groq liczy kalorie..."):
             try:
-                res = get_calories_groq(food_input, api_key)
-                st.session_state.meals.append({"name": res["name"], "calories": int(res["calories"]), "time": meal_time})
+                result = get_calories_groq(text, api_key)
+                st.session_state.meals.append({
+                    "name": result["name"],
+                    "calories": int(result["calories"]),
+                    "time": meal_time
+                })
                 st.rerun()
             except Exception as e:
+                st.error(f"Błąd: {e}") # Ta linia MUSI być wcięta względem except
