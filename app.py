@@ -171,26 +171,23 @@ with col3:
 st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{pct*100}%; background:{bar_color};"></div></div>', unsafe_allow_html=True)
 
 with st.form("meal_form", clear_on_submit=True):
-    food_input = st.text_input("Co zjadłeś/aś?", placeholder="np. jajecznica z 3 jaj, masło, 2 kromki chleba...")
+    food_input = st.text_input("Co zjadłeś/aś?", placeholder="np. 2 jajka, 100g twarogu...")
+    
+    # Dodajemy wybór pory posiłku
+    meal_time = st.selectbox("Pora posiłku", ["Śniadanie", "Drugie śniadanie", "Obiad", "Kolacja", "Przekąska"])
+    
     submitted = st.form_submit_button("➕ Dodaj posiłek", use_container_width=True)
 
 if submitted and food_input.strip():
-    text = food_input.strip()
-    if detect_bread(text):
-        grams = parse_bread_grams(text)
-        kcal = round(BREAD_KCAL_PER_100G * grams / 100)
-        st.session_state.meals.append({"name": f"🍞 Chleb własny ({grams}g)", "calories": kcal})
-        st.rerun()
-    elif not api_key:
-        st.warning("⚠️ Brak klucza Groq API!")
-    else:
-        with st.spinner("🤔 Groq liczy kalorie..."):
-            try:
-                result = get_calories_groq(text, api_key)
-                st.session_state.meals.append({"name": result["name"], "calories": int(result["calories"])})
-                st.rerun()
-            except Exception as e:
-                st.error(f"Błąd: {e}")
+    # ... (tutaj zostaje Twoja logika detect_bread i get_calories_groq)
+    # Przy dodawaniu do sesji dodaj pole "time":
+    
+    # PRZYKŁAD (dla chleba):
+    # st.session_state.meals.append({
+    #     "name": f"🍞 Chleb własny ({grams}g)", 
+    #     "calories": kcal, 
+    #     "time": meal_time
+    # })
 
 # Lista posiłków
 if st.session_state.meals:
