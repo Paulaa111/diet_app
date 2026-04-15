@@ -1,144 +1,172 @@
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
 import json
-import requests
-import pandas as pd  # Brakowało tego!
-from datetime import date, datetime, timedelta # Dodałem timedelta!
+import os
+from datetime import date, datetime, timedelta
 
-# --- 1. KONFIGURACJA STRONY I CSS ---
-st.set_page_config(page_title="Mój Dziennik 1500 kcal", page_icon="🥑", layout="wide")
+# --- Konfiguracja strony ---
+st.set_page_config(page_title="Dziennik Makro", page_icon="🥑", layout="wide")
 
+# --- Funkcje zapisu danych ---
+DATA_FILE = "history_meals_v3.json"
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except: return []
+    return []
+
+def save_meal(meal_dict):
+    history = load_data()
+    meal_dict["date"] = str(date.today())
+    meal_dict["id"] = datetime.now().timestamp()
+    history.append(meal_dict)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=4, ensure_ascii=False)
+
+def delete_meal_from_file(meal_id):
+    history = load_data()
+    history = [m for m in history if m.get("id") != meal_id]
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=4, ensure_ascii=False)
+
+# --- STYLIZACJA ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
 .stApp { background-color: #fdfaf5; color: #4a4a4a; font-family: 'Quicksand', sans-serif; }
+
 .main-title { font-size: 3rem; font-weight: 700; color: #6b8e23; text-align: center; margin-top: -30px; }
-.subtitle { text-align: center; color: #8c7b6c; font-size: 1.1rem; margin-bottom: 2rem; }
 .stat-box {
-    background: white; border-radius: 20px; padding: 20px; text-align: center;
-    box-shadow: 0 10px 20px rgba(139, 123, 108, 0.05); border-bottom: 5px solid #e0d7cd;
+    background: white; border-radius: 15px; padding: 15px; text-align: center;
+    box-shadow: 0 8px 16px rgba(139, 123, 108, 0.1); border-bottom: 4px solid #e0d7cd;
 }
-.stat-value { font-size: 2.8rem; font-weight: 800; line-height: 1; margin-bottom: 5px; }
+.stat-value { font-size: 2.2rem; font-weight: 800; line-height: 1; margin-bottom: 5px; }
 .stat-label { font-size: 0.8rem; color: #a69080; text-transform: uppercase; font-weight: 700; }
+
 .meal-card {
-    background: white; border-radius: 12px; padding: 12px 20px; margin: 8px 0;
+    background: white; border-radius: 12px; padding: 12px; margin: 5px 0;
     display: flex; justify-content: space-between; align-items: center; border: 1px solid #f0ede9;
 }
-.meal-info-name { font-weight: 700; color: #4a4a4a; font-size: 1.1rem; }
-.meal-stats-label { background: #f1f3eb; color: #6b8e23; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; }
-.section-header { color: #6b8e23; font-size: 1.5rem; font-weight: 700; margin-top: 25px; border-bottom: 2px solid #e9e2d8; }
-div.stButton > button:first-child {
-    background-color: #d4a373; color: white; border-radius: 12px; font-weight: 700; border: none; width: 100%;
-}
+.meal-stats { background: #f1f3eb; color: #6b8e23; padding: 5px 12px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; }
+.section-header { color: #6b8e23; font-size: 1.3rem; font-weight: 700; margin-top: 20px; border-bottom: 2px solid #e9e2d8; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. FUNKCJE TECHNICZNE ---
+# --- Logika AI i Chleba ---
+BREAD_VALS = {"kcal": 211, "protein": 12, "fat": 5, "carbs": 25}
 
-def connect_to_gsheets():
-    try:
-        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-        client = gspread.authorize(creds)
-        # WAŻNE: Nazwa musi być identyczna jak w Google Drive!
-        return client.open("Dziennik Kalorii").sheet1
-    except Exception as e:
-        st.error(f"Problem z połączeniem z Google Sheets: {e}")
-        return None
+def detect_bread(text: str) -> bool:
+    return any(kw in text.lower() for kw in ["chleb z otrębami", "chleb otręby", "chleb twarogowy", "chleb własny", "mój chleb"])
 
-def get_polish_day():
-    dni = {0: "Poniedziałek", 1: "Wtorek", 2: "Środa", 3: "Czwartek", 4: "Piątek", 5: "Sobota", 6: "Niedziela"}
-    return dni[date.today().weekday()]
-
-def get_nutrition_ai(food_desc, api_key):
+def get_nutrition_groq(food_description: str, api_key: str) -> dict:
+    import requests
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    prompt = f"Oszacuj kalorie, białko, tłuszcze i węgle dla: {food_desc}. Zwróć TYLKO czysty JSON: {{\"name\": \"...\", \"kcal\": 100, \"p\": 10, \"f\": 5, \"c\": 20}}"
+    prompt = f"""Oszacuj kalorie, białko, tłuszcze i węglowodany dla: {food_description}. 
+    Zwróć TYLKO czysty JSON: {{"name": "...", "calories": 100, "protein": 10, "fat": 5, "carbs": 20}}"""
     payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.1}
-    res = requests.post(url, headers=headers, json=payload, timeout=15).json()
-    content = res['choices'][0]['message']['content'].strip()
-    return json.loads(content[content.find('{'):content.rfind('}')+1])
+    response = requests.post(url, headers=headers, json=payload, timeout=15)
+    res_text = response.json()['choices'][0]['message']['content'].strip()
+    start, end = res_text.find('{'), res_text.rfind('}') + 1
+    return json.loads(res_text[start:end])
 
-def delete_from_gsheets(meal_name, meal_time, meal_date):
-    sheet = connect_to_gsheets()
-    if sheet:
-        all_rows = sheet.get_all_values()
-        for i, row in enumerate(all_rows):
-            if len(row) > 3 and row[1] == meal_date and row[2] == meal_time and row[3] == meal_name:
-                sheet.delete_rows(i + 1)
-                return True
-    return False
+# --- UI ---
+st.markdown('<div class="main-title">🥑 Dziennik Makro</div>', unsafe_allow_html=True)
 
-# --- 3. LOGIKA I UI ---
+history = load_data()
+today_meals = [m for m in history if m["date"] == str(date.today())]
 
-st.markdown('<div class="main-title">🥑 Mój Dziennik</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Cel: 1500 kcal | Białko: >100g</div>', unsafe_allow_html=True)
+LIMIT_KCAL = 1500
+total_kcal = sum(m["calories"] for m in today_meals)
+total_p = sum(m.get("protein", 0) for m in today_meals)
+total_f = sum(m.get("fat", 0) for m in today_meals)
+total_c = sum(m.get("carbs", 0) for m in today_meals)
 
-sheet = connect_to_gsheets()
-all_data = []
-today_meals = []
-today_str = str(date.today())
-
-if sheet:
-    try:
-        all_data = sheet.get_all_records()
-        today_meals = [row for row in all_data if str(row.get('Data')) == today_str]
-    except Exception as e:
-        st.warning("Arkusz jest pusty lub ma błędne nagłówki.")
-
-# Obliczenia makro
-total_kcal = sum(int(row.get('Kalorie', 0)) for row in today_meals)
-total_p = sum(int(row.get('Białko', 0)) for row in today_meals)
-total_f = sum(int(row.get('Tłuszcz', 0)) for row in today_meals)
-total_c = sum(int(row.get('Węgle', 0)) for row in today_meals)
-
-# STATYSTYKI
-c1, c2, c3, c4 = st.columns(4)
+# STATYSTYKI DNIA
+c1, c2, c3, c4, c5 = st.columns(5)
 with c1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_kcal}</div><div class="stat-label">Kcal</div></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="stat-box"><div class="stat-value">{1500 - total_kcal}</div><div class="stat-label">Zostało</div></div>', unsafe_allow_html=True)
-with c3:
-    p_color = "#6b8e23" if total_p >= 100 else "#bc6c25"
-    st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:{p_color}">{total_p}g</div><div class="stat-label">Białko</div></div>', unsafe_allow_html=True)
-with c4: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_f}g / {total_c}g</div><div class="stat-label">T / W</div></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#6b8e23">{total_p}g</div><div class="stat-label">Białko</div></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#bc6c25">{total_f}g</div><div class="stat-label">Tłuszcz</div></div>', unsafe_allow_html=True)
+with c4: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#4299e1">{total_c}g</div><div class="stat-label">Węgle</div></div>', unsafe_allow_html=True)
+with c5: 
+    rem = LIMIT_KCAL - total_kcal
+    st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#a69080">{rem}</div><div class="stat-label">Zostało</div></div>', unsafe_allow_html=True)
 
 # FORMULARZ
-st.sidebar.markdown("### ⚙️ Ustawienia")
-api_key = st.sidebar.text_input("Klucz Groq API", type="password")
+with st.sidebar:
+    st.markdown("### ⚙️ Ustawienia")
+    api_key = st.secrets.get("GROQ_API_KEY") or st.text_input("Klucz Groq API", type="password")
+    if st.button("🗑️ Wyczyść całą historię"):
+        if os.path.exists(DATA_FILE): os.remove(DATA_FILE)
+        st.rerun()
 
 with st.form("meal_form", clear_on_submit=True):
-    f1, f2 = st.columns([3, 1])
-    with f1: food_input = st.text_input("Co zjadłaś?")
-    with f2: meal_time = st.selectbox("Pora", ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"])
-    submitted = st.form_submit_button("DODAJ")
+    col_in, col_sel = st.columns([3, 1])
+    with col_in: food_input = st.text_input("Co dziś zjadłaś?")
+    with col_sel: meal_time = st.selectbox("Pora", ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"])
+    submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
 
-if submitted and food_input and api_key and sheet:
+if submitted and food_input:
     try:
-        with st.spinner("Pracuję..."):
-            d = get_nutrition_ai(food_input, api_key)
-            new_row = [get_polish_day(), today_str, meal_time, d['name'], d['kcal'], d['p'], d['f'], d['c']]
-            sheet.append_row(new_row)
-            st.rerun()
+        if detect_bread(food_input):
+            import re
+            m = re.search(r'(\d+)\s*g', food_input.lower())
+            g = int(m.group(1)) if m else 80
+            new_meal = {
+                "name": f"🍞 Chleb własny ({g}g)",
+                "calories": round(BREAD_VALS["kcal"] * g / 100),
+                "protein": round(BREAD_VALS["protein"] * g / 100),
+                "fat": round(BREAD_VALS["fat"] * g / 100),
+                "carbs": round(BREAD_VALS["carbs"] * g / 100),
+                "time": meal_time
+            }
+        else:
+            res = get_nutrition_groq(food_input, api_key)
+            new_meal = {
+                "name": res["name"],
+                "calories": int(res["calories"]),
+                "protein": int(res.get("protein", 0)),
+                "fat": int(res.get("fat", 0)),
+                "carbs": int(res.get("carbs", 0)),
+                "time": meal_time
+            }
+        save_meal(new_meal)
+        st.rerun()
     except Exception as e: st.error(f"Błąd: {e}")
 
-# LISTA
+# LISTA POSIŁKÓW
+st.markdown('<div class="section-header">Dzisiejsze Menu</div>', unsafe_allow_html=True)
 if today_meals:
-    st.markdown('<div class="section-header">Dzisiejsze Menu</div>', unsafe_allow_html=True)
-    for m in today_meals:
-        col_info, col_del = st.columns([7, 1])
-        with col_info:
-            st.markdown(f'<div class="meal-card"><span class="meal-info-name">{m.get("Nazwa")}</span><span class="meal-stats-label">{m.get("Kalorie")} kcal | B:{m.get("Białko")}g</span></div>', unsafe_allow_html=True)
-        with col_del:
-            if st.button("🗑️", key=f"del_{m.get('Nazwa')}_{m.get('Pora')}"):
-                if delete_from_gsheets(m.get('Nazwa'), m.get('Pora'), today_str): st.rerun()
+    for cat in ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"]:
+        meals = [m for m in today_meals if m["time"] == cat]
+        if meals:
+            st.write(f"**{cat}**")
+            for m in meals:
+                c1, c2 = st.columns([8, 1])
+                with c1: st.markdown(f'<div class="meal-card"><span>{m["name"]}</span><span class="meal-stats">{m["calories"]} kcal | B:{m["protein"]}g T:{m["fat"]}g W:{m["carbs"]}g</span></div>', unsafe_allow_html=True)
+                with c2: 
+                    if st.button("🗑️", key=str(m.get("id"))):
+                        delete_meal_from_file(m.get("id"))
+                        st.rerun()
+else:
+    st.info("Dodaj swój pierwszy posiłek powyżej!")
 
-# WYKRES
-if all_data:
-    st.markdown('<div class="section-header">Ostatnie 7 dni</div>', unsafe_allow_html=True)
-    last_7 = []
+# --- PODSUMOWANIE TYGODNIA ---
+st.write("")
+st.markdown('<div class="section-header">Podsumowanie Tygodnia</div>', unsafe_allow_html=True)
+
+if history:
+    week_data = {}
     for i in range(6, -1, -1):
-        d_raw = date.today() - timedelta(days=i)
-        d_str = str(d_raw)
-        day_sum = sum(int(row.get('Kalorie', 0)) for row in all_data if str(row.get('Data')) == d_str)
-        last_7.append({"Dzień": d_raw.strftime("%d.%m"), "Kcal": day_sum})
-    st.bar_chart(pd.DataFrame(last_7), x="Dzień", y="Kcal")
+        d = (date.today() - timedelta(days=i))
+        d_str = str(d)
+        day_sum = sum(m["calories"] for m in history if m["date"] == d_str)
+        week_data[d.strftime("%d.%m")] = day_sum
+    
+    st.bar_chart(week_data)
+    
+    # Mała statystyka pod wykresem
+    avg_kcal = sum(week_data.values()) / 7
+    st.write(f"Średnie kalorie z ostatnich 7 dni: **{avg_kcal:.0f} kcal**")
