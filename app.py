@@ -114,29 +114,33 @@ def parse_bread_grams(text: str) -> int:
 # Gemini API
 # ---------------------------------------------------------------
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
-    # Konfiguracja oficjalną biblioteką (rozwiązuje błąd 404)
+    # Konfiguracja - biblioteka sama dobierze właściwe v1 lub v1beta
     genai.configure(api_key=api_key)
+    
+    # Próbujemy użyć wersji flash, która jest najstabilniejsza
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
     Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON:
     {{
-      "name": "Przyjazna polska nazwa dania",
-      "calories": <liczba całkowita>,
-      "note": "Krótka uwaga o porcji"
+      "name": "Nazwa dania",
+      "calories": 100,
+      "note": "Krótka informacja"
     }}"""
     
-    # Wywołanie dedykowaną metodą
+    # Wywołanie nową metodą
     response = model.generate_content(prompt)
     
-    # Pobranie tekstu i czyszczenie z ewentualnych znaczników ```json
-    raw_text = response.text.strip()
-    if "```json" in raw_text:
-        raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-    elif "```" in raw_text:
-        raw_text = raw_text.split("```")[1].strip()
+    # Wyciąganie tekstu (biblioteka sama czyści śmieci z odpowiedzi)
+    res_text = response.text.strip()
+    
+    # Na wypadek gdyby AI dodało ```json ... ```
+    if "```json" in res_text:
+        res_text = res_text.split("```json")[1].split("```")[0].strip()
+    elif "```" in res_text:
+        res_text = res_text.split("```")[1].strip()
         
-    return json.loads(raw_text)
+    return json.loads(res_text)
 
 # ---------------------------------------------------------------
 # Sesja
