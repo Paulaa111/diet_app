@@ -3,7 +3,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 import requests
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 # --- 1. KONFIGURACJA STRONY I CSS ---
 st.set_page_config(page_title="Mój Dziennik 1500 kcal", page_icon="🥑", layout="wide")
