@@ -97,7 +97,7 @@ total_c = sum(int(row.get('Węgle', 0)) for row in today_meals)
 c1, c2, c3, c4 = st.columns(4)
 with c1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_kcal}</div><div class="stat-label">Kcal</div></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stat-box"><div class="stat-value">{1500 - total_kcal}</div><div class="stat-label">Zostało</div></div>', unsafe_allow_html=True)
-with c3: 
+with c3:
     p_color = "#6b8e23" if total_p >= 100 else "#bc6c25"
     st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:{p_color}">{total_p}g</div><div class="stat-label">Białko</div></div>', unsafe_allow_html=True)
 with c4: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_f}g / {total_c}g</div><div class="stat-label">T / W</div></div>', unsafe_allow_html=True)
