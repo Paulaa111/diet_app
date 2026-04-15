@@ -114,7 +114,7 @@ def parse_bread_grams(text: str) -> int:
 # Gemini API
 # ---------------------------------------------------------------
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
 
 Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON (bez żadnego innego tekstu, bez markdown):
