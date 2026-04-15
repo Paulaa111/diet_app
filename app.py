@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import requests
+import google.generativeai as genai  # Dodaj to
 from datetime import date
 
 # --- Konfiguracja strony ---
@@ -114,25 +115,24 @@ def parse_bread_grams(text: str) -> int:
 # Gemini API
 # ---------------------------------------------------------------
 def get_calories_gemini(food_description: str, api_key: str) -> dict:
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Konfiguracja oficjalnego klienta
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
     prompt = f"""Jesteś ekspertem od dietetyki. Użytkownik napisał co zjadł: "{food_description}"
-
-Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON (bez żadnego innego tekstu, bez markdown):
-{{
-  "name": "Przyjazna polska nazwa dania",
-  "calories": <liczba całkowita>,
-  "note": "Krótka uwaga o porcji"
-}}"""
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 256}
-    }
-    resp = requests.post(url, json=payload, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
-    raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    raw = raw.replace("```json", "").replace("```", "").strip()
-    return json.loads(raw)
+    Oszacuj kalorie. Odpowiedz WYŁĄCZNIE w formacie JSON (bez markdown):
+    {{
+      "name": "Przyjazna polska nazwa dania",
+      "calories": <liczba całkowita>,
+      "note": "Krótka uwaga o porcji"
+    }}"""
+    
+    response = model.generate_content(prompt)
+    
+    # Wyciąganie tekstu i czyszczenie
+    res_text = response.text.strip()
+    res_text = res_text.replace("```json", "").replace("```", "").strip()
+    return json.loads(res_text)
 
 # ---------------------------------------------------------------
 # Sesja
