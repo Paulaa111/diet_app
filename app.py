@@ -34,20 +34,19 @@ def load_data():
     try:
         sheet = get_sheet()
         rows = sheet.get_all_records()
-        # Mapuj nagłówki arkusza → nazwy używane w kodzie
         meals = []
-        for r in rows:
+        for idx, r in enumerate(rows):
             meals.append({
-                "id":       str(r.get("Data", "")) + "_" + str(r.get("Pora", "")) + "_" + str(r.get("Nazwa", "")),
-                "date":     str(r.get("Data", "")),
-                "time":     str(r.get("Pora", "")),
-                "name":     str(r.get("Nazwa", "")),
-                "calories": int(r.get("Kalorie", 0) or 0),
-                "protein":  float(r.get("Białko", 0) or 0),
-                "fat":      float(r.get("Tłuszcz", 0) or 0),
-                "carbs":    float(r.get("Węglowodany", 0) or 0),
-                # Potrzebne do usuwania — numer wiersza
-                "_row":     rows.index(r) + 2,  # +2 bo wiersz 1 = nagłówek
+                "id":        str(r.get("Data", "")) + "_" + str(r.get("Pora", "")) + "_" + str(r.get("Nazwa", "")),
+                "date":      str(r.get("Data", "")),
+                "time":      str(r.get("Pora", "")),
+                "name":      str(r.get("Nazwa", "")),
+                "calories":  int(r.get("Kalorie", 0) or 0),
+                "protein":   float(r.get("Białko", 0) or 0),
+                "fat":       float(r.get("Tłuszcz", 0) or 0),
+                "carbs":     float(r.get("Węglowodany", 0) or 0),
+                "suma_dnia": r.get("Suma dnia", ""),
+                "_row":      idx + 2,  # +2 bo wiersz 1 = nagłówek
             })
         return meals
     except Exception as e:
@@ -55,14 +54,12 @@ def load_data():
         return []
 
 def save_meal(meal_dict):
-    """Dodaj jeden wiersz na dole arkusza."""
+    """Dodaj jeden wiersz na dole arkusza (9 kolumn, Suma dnia pusta)."""
     try:
         sheet = get_sheet()
         today = str(date.today())
-        # Dzień tygodnia po polsku
         days_pl = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
         day_name = days_pl[date.today().weekday()]
-
         row = [
             day_name,
             today,
@@ -72,10 +69,41 @@ def save_meal(meal_dict):
             meal_dict.get("protein", 0),
             meal_dict.get("fat", 0),
             meal_dict.get("carbs", 0),
+            "",  # Suma dnia — pusta przy dodawaniu posiłku
         ]
         sheet.append_row(row, value_input_option="USER_ENTERED")
     except Exception as e:
         st.error(f"❌ Nie udało się zapisać do arkusza: {e}")
+
+def save_daily_summary(today_meals: list):
+    """
+    Znajdź pierwszy wiersz dzisiejszego dnia w arkuszu
+    i wpisz sumę kalorii do kolumny 'Suma dnia' (kolumna I = nr 9).
+    Jeśli suma już była wpisana — nadpisuje.
+    """
+    try:
+        sheet = get_sheet()
+        total = sum(m["calories"] for m in today_meals)
+        total_p = sum(m.get("protein", 0) for m in today_meals)
+        total_f = sum(m.get("fat", 0) for m in today_meals)
+        total_c = sum(m.get("carbs", 0) for m in today_meals)
+
+        # Znajdź numer pierwszego wiersza dzisiejszego dnia
+        first_row = min(m["_row"] for m in today_meals)
+
+        # Kolumna I (9) = "Suma dnia" — wpisujemy czytelny tekst
+        summary_text = f"{total} kcal | B:{total_p:.0f}g T:{total_f:.0f}g W:{total_c:.0f}g"
+        sheet.update_cell(first_row, 9, summary_text)
+
+        # Wyczyść kolumnę I dla pozostałych wierszy tego dnia (żeby nie było duplikatów)
+        for m in today_meals:
+            if m["_row"] != first_row:
+                sheet.update_cell(m["_row"], 9, "")
+
+        return total
+    except Exception as e:
+        st.error(f"❌ Nie udało się zapisać podsumowania: {e}")
+        return None
 
 def delete_meal_by_row(row_number: int):
     """Usuń wiersz o podanym numerze z arkusza."""
@@ -231,6 +259,24 @@ if today_meals:
 else:
     st.info("Dodaj swój pierwszy posiłek powyżej!")
 
+
+# PRZYCISK PODSUMOWANIA DNIA
+if today_meals:
+    st.write("")
+    col_sum, col_info = st.columns([2, 5])
+    with col_sum:
+        if st.button("📊 Zapisz podsumowanie dnia do arkusza", use_container_width=True):
+            with st.spinner("Zapisuję podsumowanie..."):
+                total = save_daily_summary(today_meals)
+                if total is not None:
+                    st.cache_resource.clear()
+                    st.success(f"✅ Zapisano! Suma dnia: **{total} kcal** — widoczna w kolumnie 'Suma dnia' przy pierwszym posiłku.")
+    with col_info:
+        first_meal = min(today_meals, key=lambda m: m["_row"])
+        if first_meal.get("suma_dnia"):
+            st.info(f"📋 Ostatnio zapisane podsumowanie: **{first_meal['suma_dnia']}**")
+        else:
+            st.caption("💡 Kliknij gdy skończyłaś dodawać posiłki — suma trafi do kolumny I w arkuszu.")
 # PODSUMOWANIE TYGODNIA
 st.write("")
 st.markdown('<div class="section-header">Podsumowanie Tygodnia</div>', unsafe_allow_html=True)
