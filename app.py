@@ -99,33 +99,29 @@ def delete_meal_by_row(row_number):
         st.error(f"❌ Nie udało się usunąć wiersza: {e}")
 
 # ---------------------------------------------------------------
-# KROK 1 — GROQ: klasyfikacja i parsowanie tekstu użytkownika
+# KROK 1 — GROQ: klasyfikacja składników
 # ---------------------------------------------------------------
 def classify_with_groq(food_description: str, api_key: str) -> list:
-    """
-    Groq analizuje tekst i zwraca listę składników z klasyfikacją źródła:
-    OFF  = produkty markowe  → Open Food Facts
-    USDA = surowce / dania domowe → USDA FoodData Central
-    """
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     system_prompt = """Jesteś ekspertem ds. żywienia. Dostajesz opis posiłku po polsku.
-Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po):
+Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
 [
   {
     "item": "polska nazwa produktu",
-    "amount": <liczba gramów jako liczba, domyślnie 100 jeśli nie podano>,
+    "amount": <liczba gramów jako liczba>,
     "source": "OFF" | "USDA",
-    "eng_name": "angielska nazwa do wyszukiwania w API"
+    "eng_name": "krótka angielska nazwa do wyszukiwania w API, max 3 słowa"
   }
 ]
 
-Zasady klasyfikacji źródła:
-- source="OFF"  → produkty markowe (Danone, Oreo, Activia, Zott, konkretna marka) LUB produkty przetworzone z etykietą sklepową
-- source="USDA" → surowce, dania domowe, warzywa, owoce, mięso, nabiał bez marki, dania gotowane
-- Każdy składnik/produkt to osobny obiekt w tablicy
-- amount zawsze w gramach (1 kromka=80g, 1 plasterek=40g, 1 jajko=60g, 1 szklanka=240g, 1 łyżka=15g, 1 łyżeczka=5g)"""
-
+Zasady:
+- source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Oreo, itp.)
+- source="USDA" → surowce, warzywa, owoce, mięso, nabiał bez marki, dania domowe
+- Każdy składnik to osobny obiekt
+- amount zawsze w gramach: 1 kromka=80g, 1 plasterek=40g, 1 jajko=60g, 1 szklanka=240g, 1 łyżka=15g, 1 łyżeczka=5g, szklanka jogurtu=200g, kubek=250g
+- eng_name: krótki i konkretny np. "greek yogurt", "chicken breast", "white rice"
+"""
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
@@ -138,144 +134,205 @@ Zasady klasyfikacji źródła:
     resp = requests.post(url, headers=headers, json=payload, timeout=20)
     resp.raise_for_status()
     raw = resp.json()["choices"][0]["message"]["content"].strip()
-    # Wyciągnij JSON nawet jeśli Groq doda jakiś tekst wokół
     start, end = raw.find("["), raw.rfind("]") + 1
     return json.loads(raw[start:end])
 
 # ---------------------------------------------------------------
-# KROK 2A — Open Food Facts
+# KROK 2 — GROQ jako fallback kalkulator (gdy API nie znajdzie)
+# ---------------------------------------------------------------
+def groq_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
+    """Groq szacuje makro dla jednego składnika gdy bazy zawiodły."""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    prompt = f"""Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g.
+Zwróć TYLKO czysty JSON (bez tekstu, bez markdown):
+{{"calories": 0, "protein": 0, "fat": 0, "carbs": 0}}"""
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 100,
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=15)
+        resp.raise_for_status()
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        start, end = raw.find("{"), raw.rfind("}") + 1
+        data = json.loads(raw[start:end])
+        return {
+            "calories": int(data.get("calories", 0)),
+            "protein":  round(float(data.get("protein", 0)), 1),
+            "fat":      round(float(data.get("fat", 0)), 1),
+            "carbs":    round(float(data.get("carbs", 0)), 1),
+            "source_label": f"Groq~szacunek",
+        }
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------
+# KROK 3A — Open Food Facts (ulepszone)
 # ---------------------------------------------------------------
 def fetch_from_off(query: str, amount_g: float) -> dict | None:
-    """
-    Szuka produktu w Open Food Facts.
-    Zwraca makro przeliczone na amount_g lub None jeśli nie znalazło.
-    """
     try:
+        # Szukaj po polsku i angielsku żeby zwiększyć szansę trafienia
         url = "https://world.openfoodfacts.org/cgi/search.pl"
         params = {
             "search_terms": query,
             "search_simple": 1,
             "action": "process",
             "json": 1,
-            "page_size": 5,
-            "fields": "product_name,nutriments",
+            "page_size": 10,
+            "sort_by": "unique_scans_n",          # najpopularniejsze produkty pierwsze
+            "fields": "product_name,nutriments,completeness",
         }
-        resp = requests.get(url, params=params, timeout=10)
+        resp = requests.get(url, params=params, timeout=12)
+        resp.raise_for_status()
         data = resp.json()
         products = data.get("products", [])
         if not products:
             return None
 
-        # Weź pierwszy produkt z kompletem makro
+        # Wybierz produkt z najbardziej kompletnymi danymi makro
+        best = None
+        best_score = -1
         for p in products:
             n = p.get("nutriments", {})
-            kcal = n.get("energy-kcal_100g") or n.get("energy_100g", 0)
-            if kcal:
-                # Przelicz kcal z kJ jeśli trzeba
-                if not n.get("energy-kcal_100g") and n.get("energy_100g"):
-                    kcal = n["energy_100g"] / 4.184
+            kcal_100 = n.get("energy-kcal_100g")
+
+            # Przelicz z kJ jeśli brak kcal
+            if not kcal_100 and n.get("energy_100g"):
+                kcal_100 = n["energy_100g"] / 4.184
+
+            if not kcal_100 or kcal_100 <= 0:
+                continue
+
+            # Sprawdź czy ma komplet makro (białko, tłuszcz, węgle)
+            has_protein = n.get("proteins_100g") is not None
+            has_fat     = n.get("fat_100g") is not None
+            has_carbs   = n.get("carbohydrates_100g") is not None
+            score = sum([has_protein, has_fat, has_carbs])
+
+            if score > best_score:
+                best_score = score
+                best = (p, n, kcal_100)
+
+        if not best:
+            return None
+
+        p, n, kcal_100 = best
+        factor = amount_g / 100
+        return {
+            "calories": round(kcal_100 * factor),
+            "protein":  round((n.get("proteins_100g") or 0) * factor, 1),
+            "fat":      round((n.get("fat_100g") or 0) * factor, 1),
+            "carbs":    round((n.get("carbohydrates_100g") or 0) * factor, 1),
+            "source_label": f"OFF:{p.get('product_name','?')[:35]}",
+        }
+    except Exception as e:
+        return None
+
+# ---------------------------------------------------------------
+# KROK 3B — USDA FoodData Central (ulepszone)
+# ---------------------------------------------------------------
+def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") -> dict | None:
+    try:
+        url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+        params = {
+            "query":    eng_name,
+            "dataType": "SR Legacy,Foundation",   # tylko naturalne składniki — dokładniejsze
+            "pageSize": 5,
+            "api_key":  usda_key,
+        }
+        resp = requests.get(url, params=params, timeout=12)
+        resp.raise_for_status()
+        data = resp.json()
+        foods = data.get("foods", [])
+
+        if not foods:
+            # Drugi strzał z Branded żeby nie oddać pola
+            params["dataType"] = "Branded"
+            resp2 = requests.get(url, params=params, timeout=12)
+            foods = resp2.json().get("foods", [])
+
+        if not foods:
+            return None
+
+        # Szukaj produktu z pełnym zestawem makro
+        for food in foods:
+            nutrients = {n["nutrientName"]: n["value"] for n in food.get("foodNutrients", [])}
+
+            # USDA używa kilku nazw dla energii — sprawdź wszystkie
+            kcal = (
+                nutrients.get("Energy") or
+                nutrients.get("Energy (Atwater General Factors)") or
+                nutrients.get("Energy (Atwater Specific Factors)") or 0
+            )
+            protein = nutrients.get("Protein", 0)
+            fat     = nutrients.get("Total lipid (fat)", 0)
+            carbs   = nutrients.get("Carbohydrate, by difference", 0)
+
+            if kcal > 0:
                 factor = amount_g / 100
                 return {
                     "calories": round(kcal * factor),
-                    "protein":  round(n.get("proteins_100g", 0) * factor, 1),
-                    "fat":      round(n.get("fat_100g", 0) * factor, 1),
-                    "carbs":    round(n.get("carbohydrates_100g", 0) * factor, 1),
-                    "source_label": f"OFF:{p.get('product_name','?')[:30]}",
+                    "protein":  round(protein * factor, 1),
+                    "fat":      round(fat * factor, 1),
+                    "carbs":    round(carbs * factor, 1),
+                    "source_label": f"USDA:{food.get('description','?')[:35]}",
                 }
         return None
     except Exception:
         return None
 
 # ---------------------------------------------------------------
-# KROK 2B — USDA FoodData Central
+# KROK 4 — Orkiestracja
 # ---------------------------------------------------------------
-def fetch_from_usda(eng_name: str, amount_g: float) -> dict | None:
-    """
-    Szuka składnika w USDA FoodData Central (nie wymaga klucza API dla Foundation Foods).
-    Zwraca makro przeliczone na amount_g lub None jeśli nie znalazło.
-    """
-    try:
-        url = "https://api.nal.usda.gov/fdc/v1/foods/search"
-        params = {
-            "query": eng_name,
-            "dataType": "SR Legacy,Foundation,Branded",
-            "pageSize": 5,
-            "api_key": "DEMO_KEY",  # DEMO_KEY działa do ~30 req/min — wystarczy
-        }
-        resp = requests.get(url, params=params, timeout=10)
-        data = resp.json()
-        foods = data.get("foods", [])
-        if not foods:
-            return None
-
-        food = foods[0]
-        nutrients = {n["nutrientName"]: n["value"] for n in food.get("foodNutrients", [])}
-
-        kcal    = nutrients.get("Energy", 0)
-        protein = nutrients.get("Protein", 0)
-        fat     = nutrients.get("Total lipid (fat)", 0)
-        carbs   = nutrients.get("Carbohydrate, by difference", 0)
-
-        factor = amount_g / 100
-        return {
-            "calories": round(kcal * factor),
-            "protein":  round(protein * factor, 1),
-            "fat":      round(fat * factor, 1),
-            "carbs":    round(carbs * factor, 1),
-            "source_label": f"USDA:{food.get('description','?')[:30]}",
-        }
-    except Exception:
-        return None
-
-# ---------------------------------------------------------------
-# KROK 3 — Orkiestracja: suma po wszystkich składnikach
-# ---------------------------------------------------------------
-def get_nutrition_hybrid(food_description: str, api_key: str) -> dict:
-    """
-    Pełny pipeline:
-    1. Groq klasyfikuje i parsuje składniki
-    2. Dla każdego składnika odpowiednie API
-    3. Sumuje makro
-    Zwraca dict z name, calories, protein, fat, carbs + debug_info
-    """
+def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
     items = classify_with_groq(food_description, api_key)
 
     total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
-    sources_used = []
-    fallback_items = []  # składniki których nie znaleziono w API
+    sources_used   = []
+    fallback_items = []
 
     for item in items:
-        name      = item.get("item", "?")
-        amount    = float(item.get("amount", 100))
-        source    = item.get("source", "USDA")
-        eng_name  = item.get("eng_name", name)
+        name     = item.get("item", "?")
+        amount   = float(item.get("amount", 100))
+        source   = item.get("source", "USDA")
+        eng_name = item.get("eng_name", name)
 
         result = None
+        tried  = []
 
         if source == "OFF":
             result = fetch_from_off(name, amount)
+            tried.append("OFF")
             if not result:
-                # fallback: spróbuj USDA
-                result = fetch_from_usda(eng_name, amount)
-
-        else:  # USDA
-            result = fetch_from_usda(eng_name, amount)
+                result = fetch_from_usda(eng_name, amount, usda_key)
+                tried.append("USDA")
+        else:
+            result = fetch_from_usda(eng_name, amount, usda_key)
+            tried.append("USDA")
             if not result:
-                # fallback: spróbuj OFF
                 result = fetch_from_off(name, amount)
+                tried.append("OFF")
+
+        # Ostateczny fallback — Groq szacuje sam
+        if not result:
+            result = groq_estimate_single(name, amount, api_key)
+            tried.append("Groq~fallback")
 
         if result:
             total["calories"] += result["calories"]
             total["protein"]  += result["protein"]
             total["fat"]      += result["fat"]
             total["carbs"]    += result["carbs"]
-            sources_used.append(f"{name} ({amount:.0f}g) → {result['source_label']}")
+            sources_used.append(
+                f"{name} ({amount:.0f}g) → {result['source_label']}"
+            )
         else:
-            fallback_items.append(f"{name} ({amount:.0f}g) — brak danych")
+            fallback_items.append(f"{name} ({amount:.0f}g) — brak danych nawet w Groq")
 
-    # Nazwa posiłku = oryginalny opis (skrócony)
     meal_name = food_description[:60] + ("…" if len(food_description) > 60 else "")
-
     return {
         "name":         meal_name,
         "calories":     total["calories"],
@@ -287,7 +344,7 @@ def get_nutrition_hybrid(food_description: str, api_key: str) -> dict:
     }
 
 # ---------------------------------------------------------------
-# POMOCNICZE — chleb własny
+# POMOCNICZE
 # ---------------------------------------------------------------
 def detect_bread(text: str) -> bool:
     return any(kw in text.lower() for kw in [
@@ -314,12 +371,11 @@ st.markdown("""
 }
 .meal-stats { background: #f1f3eb; color: #6b8e23; padding: 5px 12px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; }
 .section-header { color: #6b8e23; font-size: 1.3rem; font-weight: 700; margin-top: 20px; border-bottom: 2px solid #e9e2d8; }
-.source-tag { font-size: 0.72rem; color: #a69080; margin-top: 2px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
-# UI — START
+# UI
 # ---------------------------------------------------------------
 st.markdown('<div class="main-title">🥑 Dziennik Makro</div>', unsafe_allow_html=True)
 
@@ -345,12 +401,13 @@ with c5:
 # SIDEBAR
 with st.sidebar:
     st.markdown("### ⚙️ Ustawienia")
-    api_key = st.secrets.get("GROQ_API_KEY", "") or st.text_input("Klucz Groq API", type="password")
+    api_key  = st.secrets.get("GROQ_API_KEY", "") or st.text_input("Klucz Groq API", type="password")
+    usda_key = st.secrets.get("USDA_API_KEY", "DEMO_KEY")
     st.markdown("---")
-    st.markdown("**Źródła danych:**")
-    st.markdown("🟢 **Groq** — klasyfikacja składników")
-    st.markdown("🔵 **Open Food Facts** — produkty markowe")
-    st.markdown("🟠 **USDA** — surowce i dania domowe")
+    st.markdown("**Źródła danych (w kolejności):**")
+    st.markdown("1️⃣ **Groq** — klasyfikacja + fallback")
+    st.markdown("2️⃣ **Open Food Facts** — produkty markowe")
+    st.markdown("3️⃣ **USDA** — surowce i dania")
     st.markdown("🍞 **Własna baza** — chleb z otrębami")
     st.markdown("---")
     st.markdown("**Arkusz:** Dziennik Kalorii")
@@ -364,16 +421,15 @@ with st.form("meal_form", clear_on_submit=True):
     with col_in:
         food_input = st.text_input(
             "Co dziś zjadłaś?",
-            placeholder="np. jogurt Danone 150g, 2 jajka sadzone, chleb z otrębami 80g…"
+            placeholder="np. jogurt Danone 150g, 2 jajka, chleb z otrębami 80g…"
         )
     with col_sel:
         meal_time = st.selectbox("Pora", ["Śniadanie","II Śniadanie","Obiad","Kolacja","Przekąska"])
     submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
 
 if submitted and food_input:
-    with st.spinner("🔍 Analizuję składniki i pobieram dane o wartościach odżywczych…"):
+    with st.spinner("🔍 Analizuję składniki…"):
         try:
-            # --- Chleb własny (bez API) ---
             if detect_bread(food_input):
                 m_g = re.search(r"(\d+)\s*g", food_input.lower())
                 g = int(m_g.group(1)) if m_g else 80
@@ -389,10 +445,8 @@ if submitted and food_input:
                 st.cache_resource.clear()
                 st.success(f"✅ {new_meal['name']} — **{new_meal['calories']} kcal** (dane własne)")
                 st.rerun()
-
-            # --- Hybrydowy pipeline ---
             else:
-                result = get_nutrition_hybrid(food_input, api_key)
+                result = get_nutrition_hybrid(food_input, api_key, usda_key)
                 new_meal = {
                     "name":     result["name"],
                     "calories": result["calories"],
@@ -403,23 +457,18 @@ if submitted and food_input:
                 }
                 save_meal(new_meal)
                 st.cache_resource.clear()
-
                 st.success(
                     f"✅ **{result['name']}** — "
                     f"**{result['calories']} kcal** | "
                     f"B:{result['protein']:.0f}g T:{result['fat']:.0f}g W:{result['carbs']:.0f}g"
                 )
-
-                # Pokaż skąd pobrano dane (expander, żeby nie zaśmiecać UI)
-                if result["sources_used"]:
-                    with st.expander("🔍 Skąd pobrano dane?"):
-                        for s in result["sources_used"]:
-                            st.caption(f"✔ {s}")
-                        for f_item in result["fallback"]:
-                            st.caption(f"⚠️ Nie znaleziono: {f_item} — pominięto")
-
+                with st.expander("🔍 Skąd pobrano dane? (kliknij żeby sprawdzić)"):
+                    for s in result["sources_used"]:
+                        icon = "🟠" if "USDA" in s else ("🔵" if "OFF" in s else "🟢")
+                        st.caption(f"{icon} {s}")
+                    for f_item in result["fallback"]:
+                        st.caption(f"⚠️ {f_item}")
                 st.rerun()
-
         except Exception as e:
             st.error(f"Błąd: {e}")
 
@@ -434,10 +483,9 @@ if today_meals:
                 c1, c2 = st.columns([8, 1])
                 with c1:
                     st.markdown(
-                        f'<div class="meal-card">'
-                        f'<span>{m["name"]}</span>'
-                        f'<span class="meal-stats">'
-                        f'{m["calories"]} kcal | B:{m["protein"]:.0f}g T:{m["fat"]:.0f}g W:{m["carbs"]:.0f}g'
+                        f'<div class="meal-card"><span>{m["name"]}</span>'
+                        f'<span class="meal-stats">{m["calories"]} kcal | '
+                        f'B:{m["protein"]:.0f}g T:{m["fat"]:.0f}g W:{m["carbs"]:.0f}g'
                         f'</span></div>',
                         unsafe_allow_html=True
                     )
@@ -449,7 +497,7 @@ if today_meals:
 else:
     st.info("Dodaj swój pierwszy posiłek powyżej!")
 
-# PRZYCISK PODSUMOWANIA DNIA
+# PODSUMOWANIE DNIA
 if today_meals:
     st.write("")
     col_sum, col_info = st.columns([2, 5])
@@ -470,7 +518,6 @@ if today_meals:
 # PODSUMOWANIE TYGODNIA
 st.write("")
 st.markdown('<div class="section-header">Podsumowanie Tygodnia</div>', unsafe_allow_html=True)
-
 if history:
     week_data = {}
     for i in range(6, -1, -1):
@@ -478,7 +525,6 @@ if history:
         d_str = str(d)
         day_sum = sum(m["calories"] for m in history if m["date"] == d_str)
         week_data[d.strftime("%d.%m")] = day_sum
-
     st.bar_chart(week_data)
     avg_kcal = sum(week_data.values()) / 7
     st.write(f"Średnie kalorie z ostatnich 7 dni: **{avg_kcal:.0f} kcal**")
