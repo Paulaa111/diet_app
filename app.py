@@ -3,6 +3,7 @@ import json
 import requests
 import re
 from datetime import date, timedelta
+from database import MY_FOOD_DB
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -288,59 +289,65 @@ def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") 
 # KROK 4 — Orkiestracja
 # ---------------------------------------------------------------
 def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
+    # KROK 1: Groq analizuje tekst i rozbija go na produkty oraz wagę
     items = classify_with_groq(food_description, api_key)
 
     total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
-    sources_used   = []
+    sources_used = []
     fallback_items = []
 
     for item in items:
-        name     = item.get("item", "?")
-        amount   = float(item.get("amount", 100))
-        source   = item.get("source", "USDA")
-        eng_name = item.get("eng_name", name)
-
+        name_ai = item.get("item", "").lower()
+        amount = float(item.get("amount", 100))
+        eng_name = item.get("eng_name", "")
+        
         result = None
-        tried  = []
+        
+        # KROK 2: SZUKANIE W TWOIM PLIKU database.py
+        # Sprawdzamy czy nazwa z AI pasuje do jakiegokolwiek klucza w Twojej bazie
+        match_key = None
+        for key in MY_FOOD_DB.keys():
+            if key in name_ai or name_ai in key:
+                match_key = key
+                break
+        
+        if match_key:
+            db_val = MY_FOOD_DB[match_key]
+            factor = amount / 100
+            result = {
+                "calories": round(db_val["kcal"] * factor),
+                "protein":  round(db_val["p"] * factor, 1),
+                "fat":      round(db_val["f"] * factor, 1),
+                "carbs":    round(db_val["c"] * factor, 1),
+                "source_label": f"🏠 MOJA BAZA ({match_key})"
+            }
 
-        if source == "OFF":
-            result = fetch_from_off(name, amount)
-            tried.append("OFF")
+        # KROK 3: JEŚLI NIE MA W TWOJEJ BAZIE -> SZUKAJ W API
+        if not result:
+            result = fetch_from_off(name_ai, amount)
             if not result:
                 result = fetch_from_usda(eng_name, amount, usda_key)
-                tried.append("USDA")
-        else:
-            result = fetch_from_usda(eng_name, amount, usda_key)
-            tried.append("USDA")
             if not result:
-                result = fetch_from_off(name, amount)
-                tried.append("OFF")
-
-        # Ostateczny fallback — Groq szacuje sam
-        if not result:
-            result = groq_estimate_single(name, amount, api_key)
-            tried.append("Groq~fallback")
+                # Ostateczny ratunek - szacowanie AI
+                result = groq_estimate_single(name_ai, amount, api_key)
 
         if result:
             total["calories"] += result["calories"]
             total["protein"]  += result["protein"]
             total["fat"]      += result["fat"]
             total["carbs"]    += result["carbs"]
-            sources_used.append(
-                f"{name} ({amount:.0f}g) → {result['source_label']}"
-            )
+            sources_used.append(f"{name_ai} ({amount:.0f}g) → {result['source_label']}")
         else:
-            fallback_items.append(f"{name} ({amount:.0f}g) — brak danych nawet w Groq")
+            fallback_items.append(f"{name_ai} — brak danych")
 
-    meal_name = food_description[:60] + ("…" if len(food_description) > 60 else "")
     return {
-        "name":         meal_name,
-        "calories":     total["calories"],
-        "protein":      round(total["protein"], 1),
-        "fat":          round(total["fat"], 1),
-        "carbs":        round(total["carbs"], 1),
+        "name": food_description[:60],
+        "calories": total["calories"],
+        "protein": round(total["protein"], 1),
+        "fat": round(total["fat"], 1),
+        "carbs": round(total["carbs"], 1),
         "sources_used": sources_used,
-        "fallback":     fallback_items,
+        "fallback": fallback_items,
     }
 
 # ---------------------------------------------------------------
