@@ -93,6 +93,9 @@ MY_FOOD_DB = {
     "chleb z otrębami": {"kcal": 211, "p": 12.0, "f": 5.0, "c": 25.0},
     "chleb żytni": {"kcal": 259, "p": 8.5, "f": 3.3, "c": 48.0},
     "bułka pszenna": {"kcal": 272, "p": 8.0, "f": 1.5, "c": 55.0},
+    "mój chleb":       {"kcal": 211, "p": 12.0, "f": 5.0, "c": 25.0},
+    "chleb twarogowy": {"kcal": 211, "p": 12.0, "f": 5.0, "c": 25.0},
+    "chleb własny":    {"kcal": 211, "p": 12.0, "f": 5.0, "c": 25.0},
 
     # --- KIEŁBASY I WĘDLINY PODROBOWE ---
     "kiełbasa zwyczajna": {"kcal": 210, "p": 17.0, "f": 16.0, "c": 1.0},
