@@ -111,8 +111,6 @@ ALIASES = {
     "chleb domowy":              "chleb z otrębami",
     "chleb żytni":               "chleb żytni",
     "chleb zytni":               "chleb żytni",
-    "kromka chleba":             "chleb z otrębami",
-    "kromki chleba":             "chleb z otrębami",
     # tłuszcze
     "finuu klasyczne":           "finuu klasyczne",
     "finuu lekkie":              "finuu lekkie",
@@ -176,9 +174,12 @@ def parse_locally(text: str) -> list:
     Rozpoznaje składniki z tekstu BEZ AI.
     Zwraca listę itemów z prawidłowo wyliczoną gramaturą.
     """
-    found   = []
+    found = []
     used_up = set()
     t = text.lower()
+    
+    # Usuń "z" między składnikami żeby nie przeszkadzało
+    t = re.sub(r'\s+z\s+', ' ', t)
 
     # Sortuj aliasy od najdłuższych do najkrótszych
     for alias in sorted(ALIASES.keys(), key=len, reverse=True):
@@ -191,44 +192,45 @@ def parse_locally(text: str) -> list:
         db_key = ALIASES[alias]
         unit_g = UNIT_GRAMS.get(db_key, 100)
 
-        # Szukaj jawnej gramatury: "150g jogurtu"
-        # Sprawdź w okolicy aliasu (10 znaków przed i 10 po)
-        search_start = max(0, pos - 10)
-        search_end = min(len(t), pos + len(alias) + 10)
-        context = t[search_start:search_end]
+        # Szukaj liczby PRZED aliasem
+        before_alias = t[max(0, pos-20):pos]
         
-        gram_match = re.search(r"(\d+)\s*g\b", context)
-        if gram_match:
-            amount = float(gram_match.group(1))
+        # Szukaj liczby (z kromkami lub bez)
+        count_match = re.search(r"(\d+)\s*(?:kromk[aię]|kromkę|kromki|sztuk[aię]|szt\.?\s*)?$", before_alias)
+        
+        if count_match:
+            count = int(count_match.group(1))
         else:
-            # Szukaj liczby sztuk PRZED aliasem
-            before_alias = t[max(0, pos-20):pos]
-            # Wzorzec dla liczby + jednostki (kromki, sztuki, itp.)
-            count_match = re.search(r"(\d+)\s*(?:kromk[aię]|kromkę|kromki|sztuk[aię]|szt\.?\s*|sztuki|sztukę)?\s*$", before_alias)
-            
-            if count_match:
-                count = int(count_match.group(1))
-            else:
-                # Szukaj samej liczby
-                simple_count = re.search(r"(\d+)\s*$", before_alias)
-                count = int(simple_count.group(1)) if simple_count else 1
-            
-            amount = unit_g * count
+            simple_count = re.search(r"(\d+)\s*$", before_alias)
+            count = int(simple_count.group(1)) if simple_count else 1
+        
+        amount = unit_g * count
 
         # Zabezpieczenie przed absurdalnymi wartościami
         amount = max(5.0, min(amount, 2000.0))
 
         found.append({
-            "item":     db_key,
-            "amount":   amount,
-            "source":   "LOCAL",
+            "item": db_key,
+            "amount": amount,
+            "source": "LOCAL",
             "eng_name": db_key,
         })
         
-        for i in range(pos, pos + len(alias)):
+        # Zaznacz użyte znaki (cały fragment od liczby do końca aliasu)
+        start_pos = max(0, pos-20)
+        for i in range(start_pos, pos + len(alias)):
             used_up.add(i)
 
-    return found
+    # Usuń duplikaty (ten sam produkt może być rozpoznany przez różne aliasy)
+    unique_found = []
+    seen_items = set()
+    for item in found:
+        key = f"{item['item']}_{item['amount']}"
+        if key not in seen_items:
+            seen_items.add(key)
+            unique_found.append(item)
+    
+    return unique_found
 
 # ---------------------------------------------------------------
 # GEMINI — helper do wysyłania zapytań
@@ -314,7 +316,7 @@ def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dic
         return None
 
 # ---------------------------------------------------------------
-# BAZA LOKALNA
+# BAZA LOKALNA - NAPRAWIONA!
 # ---------------------------------------------------------------
 def lookup_in_db(db_key: str, amount_g: float) -> dict | None:
     """Szuka dokładnie po kluczu w MY_FOOD_DB."""
@@ -326,7 +328,7 @@ def lookup_in_db(db_key: str, amount_g: float) -> dict | None:
     if not v:
         return None
     
-    # Oblicz mnożnik - baza jest na 100g
+    # TWOJA BAZA JEST NA 100g - dzielimy przez 100!
     multiplier = amount_g / 100.0
     
     return {
@@ -415,73 +417,30 @@ def fetch_from_usda(eng_name: str, amount_g: float,
 def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
     # Krok 1: Rozpoznaj lokalnie
     local_items = parse_locally(food_description)
-    local_keys = {it["item"] for it in local_items}
-
-    # Krok 2: Gemini dla nierozpoznanych składników
-    gemini_items = []
-    temp = food_description.lower()
-    for alias in ALIASES:
-        temp = temp.replace(alias, "")
-    has_unknown = bool(re.sub(r"[\d\s,gz./]", "", temp).strip())
-
-    if has_unknown and api_key:
-        try:
-            all_gemini = classify_with_gemini(food_description, api_key)
-            gemini_items = [it for it in all_gemini
-                            if it.get("item", "").lower() not in local_keys
-                            and ALIASES.get(it.get("item", "").lower()) not in local_keys]
-        except Exception as e:
-            st.warning(f"⚠️ Gemini niedostępny: {e}. Używam tylko lokalnej bazy.")
-
-    items = local_items + gemini_items
-
-    # Jeśli nic nie znaleziono, spróbuj całość przez Gemini
-    if not items and api_key:
-        try:
-            items = classify_with_gemini(food_description, api_key)
-        except Exception:
-            pass
+    
+    # DEBUG - zobacz co zostało rozpoznane
+    st.write(f"DEBUG: Rozpoznane lokalnie: {local_items}")
 
     total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
     sources_used = []
     fallback_items = []
 
-    for item in items:
+    for item in local_items:
         name_ai = item.get("item", "").lower().strip()
-        raw_amt = item.get("amount", 100)
+        amount = item.get("amount", 100)
         
-        # Pobierz gramaturę
-        try:
-            amount = float(re.sub(r"[^0-9.]", "", str(raw_amt)) or "100")
-        except Exception:
-            amount = 100.0
+        st.write(f"DEBUG: Przetwarzam {name_ai} - {amount}g")
         
-        # Zabezpieczenie - ale z większym limitem (dla 2 kromek chleba = 160g)
-        amount = max(5.0, min(amount, 2000.0))
-
-        source = item.get("source", "USDA")
-        eng_name = item.get("eng_name", name_ai)
-
         # 1️⃣ Własna baza
         result = lookup_in_db(name_ai, amount)
-
-        # 2️⃣ API zewnętrzne
-        if not result:
-            if source == "OFF":
-                result = fetch_from_off(name_ai, amount) or fetch_from_usda(eng_name, amount, usda_key)
-            else:
-                result = fetch_from_usda(eng_name, amount, usda_key) or fetch_from_off(name_ai, amount)
-
-        # 3️⃣ Gemini szacuje
-        if not result and api_key:
-            result = gemini_estimate_single(name_ai, amount, api_key)
-
+        
         if result:
             total["calories"] += result["calories"]
             total["protein"] += result["protein"]
             total["fat"] += result["fat"]
             total["carbs"] += result["carbs"]
             sources_used.append(f"{name_ai} ({amount:.0f}g) → {result['source_label']}")
+            st.write(f"DEBUG: Wynik - B:{result['protein']}g")
         else:
             fallback_items.append(f"{name_ai} ({amount:.0f}g) — brak danych")
 
