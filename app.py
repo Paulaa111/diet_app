@@ -314,6 +314,9 @@ with st.form("meal_form", clear_on_submit=True):
 
 st.write("TEST:", parse_meal("2 kromki mojego chleba"))
 st.write("TEST2:", parse_meal("łyżka finuu"))
+# NOWY DEBUG
+st.write("NUTRITION:", calculate_nutrition("chleb z otrębami", 160))
+st.write("DB:", MY_FOOD_DB.get("chleb z otrębami"))
 
 if submitted and food_input:
     with st.spinner("🔍 Analizuję…"):
