@@ -90,51 +90,87 @@ def delete_meal_by_row(row_number):
         st.error(f"❌ Błąd usuwania: {e}")
 
 # ---------------------------------------------------------------
-# PROSTE ROZPOZNAWANIE - NAPRAWIONE!
+# PROSTE ROZPOZNAWANIE - BEZ ŻADNYCH ZAWIŁOŚCI
 # ---------------------------------------------------------------
 
+# Gramatura 1 sztuki (w gramach)
+PORTIONS = {
+    "kromka": 80,
+    "kromki": 80,
+    "łyżeczka": 10,
+    "łyżka": 15,
+    "sztuka": 60,
+    "sztuki": 60,
+}
+
+# Aliasy produktów
+PRODUCTS = {
+    "chleb": "chleb z otrębami",
+    "mojego chleba": "chleb z otrębami",
+    "mój chleb": "chleb z otrębami",
+    "finuu": "finuu klasyczne",
+}
+
 def parse_meal(text):
-    """Parsuje tekst i zwraca listę (produkt, gramy)"""
+    """Proste parsowanie - zwraca listę (produkt, gramy)"""
     text = text.lower()
     results = []
     
-    # Rozpoznaj "2 kromki chleba" - daje 160g
-    match = re.search(r'(\d+)\s*kromk[aię]\s*(.+?)(?:\s+z\s+|\s*$)', text)
-    if match:
+    # Szukaj wzorca: "liczba kromki produkt" lub "liczba produkt"
+    # Przykład: "2 kromki mojego chleba" lub "2 chleb"
+    
+    # Wzór 1: liczba + jednostka + produkt
+    pattern1 = r'(\d+)\s+(kromk[aię]|kromki|łyżeczk[aię]|łyżk[aię]|sztuk[aię])\s+(.+?)(?:\s+z\s+|\s*$)'
+    # Wzór 2: liczba + produkt (bez jednostki)
+    pattern2 = r'(\d+)\s+(.+?)(?:\s+z\s+|\s*$)'
+    
+    # Szukaj wszystkich dopasowań
+    for match in re.finditer(pattern1, text):
         count = int(match.group(1))
-        product_text = match.group(2).strip()
+        unit = match.group(2)
+        product = match.group(3).strip()
         
-        # Czy to chleb?
-        if 'chleb' in product_text or 'chleba' in product_text:
-            grams = count * 80  # 80g na kromkę
-            results.append(('chleb z otrębami', grams))
-            # Usuń przetworzony fragment
-            text = text.replace(match.group(0), '')
+        # Sprawdź czy produkt jest w aliasach
+        for alias, real_name in PRODUCTS.items():
+            if alias in product:
+                product_name = real_name
+                break
+        else:
+            product_name = product
+        
+        grams = PORTIONS.get(unit, 80) * count
+        results.append((product_name, grams))
+        
+        # Usuń przetworzony fragment
+        text = text.replace(match.group(0), "")
     
-    # Rozpoznaj "finuu" (samo, bez liczby - domyślnie 1 porcja)
-    if 'finuu' in text:
-        results.append(('finuu klasyczne', 10))  # 10g = 1 łyżeczka
-    
-    # Rozpoznaj inne produkty (opcjonalnie)
-    # Jajka
-    match = re.search(r'(\d+)\s*jajk[oa]', text)
-    if match:
+    # Szukaj bez jednostki
+    for match in re.finditer(pattern2, text):
         count = int(match.group(1))
-        results.append(('jajko kurze', count * 60))
-    
-    # Jogurt
-    if 'jogurt' in text or 'piątnica' in text:
-        results.append(('jogurt naturalny piątnica 2%', 150))
+        product = match.group(2).strip()
+        
+        # Sprawdź czy produkt jest w aliasach
+        for alias, real_name in PRODUCTS.items():
+            if alias in product:
+                product_name = real_name
+                break
+        else:
+            product_name = product
+        
+        # Domyślna porcja - 1 sztuka
+        grams = 80 * count
+        results.append((product_name, grams))
     
     return results
 
 def calculate_nutrition(product_name, grams):
-    """Oblicza wartości odżywcze - BAZA NA 100g!"""
+    """Oblicza wartości odżywcze dla produktu"""
+    # Pobierz z bazy
     data = MY_FOOD_DB.get(product_name)
     if not data:
         return None
     
-    # WAŻNE: DZIELIMY PRZEZ 100!
+    # Mnożnik - baza na 100g
     multiplier = grams / 100.0
     
     return {
@@ -200,8 +236,6 @@ if submitted and food_input:
         # Parsuj
         items = parse_meal(food_input)
         
-        st.write("DEBUG: Rozpoznane składniki:", items)  # Pokaże co zostało rozpoznane
-        
         if not items:
             st.error("❌ Nie rozpoznano składników. Spróbuj: '2 kromki chleba z finuu'")
         else:
@@ -215,7 +249,7 @@ if submitted and food_input:
                     total["protein"] += nutrition["protein"]
                     total["fat"] += nutrition["fat"]
                     total["carbs"] += nutrition["carbs"]
-                    details.append(f"{product_name}: {grams}g → {nutrition['calories']} kcal, B:{nutrition['protein']}g, T:{nutrition['fat']}g, W:{nutrition['carbs']}g")
+                    details.append(f"{product_name}: {grams}g → {nutrition['calories']} kcal")
                 else:
                     details.append(f"⚠️ {product_name}: brak w bazie")
             
@@ -231,7 +265,7 @@ if submitted and food_input:
             save_meal(new_meal)
             st.cache_resource.clear()
             
-            st.success(f"✅ {food_input[:50]} — {total['calories']} kcal | B:{total['protein']:.1f}g T:{total['fat']:.1f}g W:{total['carbs']:.1f}g")
+            st.success(f"✅ {food_input[:50]} — {total['calories']} kcal | B:{total['protein']:.0f}g T:{total['fat']:.0f}g W:{total['carbs']:.0f}g")
             with st.expander("📊 Szczegóły"):
                 for d in details:
                     st.write(d)
