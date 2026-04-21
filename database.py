@@ -93,4 +93,17 @@ MY_FOOD_DB = {
     "chleb z otrębami": {"kcal": 211, "p": 12.0, "f": 5.0, "c": 25.0},
     "chleb żytni": {"kcal": 259, "p": 8.5, "f": 3.3, "c": 48.0},
     "bułka pszenna": {"kcal": 272, "p": 8.0, "f": 1.5, "c": 55.0},
+
+    # --- KIEŁBASY I WĘDLINY PODROBOWE ---
+    "kiełbasa zwyczajna": {"kcal": 210, "p": 17.0, "f": 16.0, "c": 1.0},
+    "kiełbasa wiejska": {"kcal": 300, "p": 16.0, "f": 25.0, "c": 1.0},
+    "kiełbasa szynkowa": {"kcal": 130, "p": 18.0, "f": 6.0, "c": 1.0}, # Najchudsza opcja!
+    "kiełbasa krakowska sucha": {"kcal": 320, "p": 25.0, "f": 24.0, "c": 2.0},
+    "kiełbasa biała surowa": {"kcal": 270, "p": 14.0, "f": 24.0, "c": 1.0},
+    "kiełbasa biała parzona": {"kcal": 230, "p": 14.0, "f": 18.0, "c": 1.0},
+    "parówki z szynki": {"kcal": 260, "p": 13.0, "f": 22.0, "c": 1.5},
+    "parówki drobiowe": {"kcal": 210, "p": 12.0, "f": 17.0, "c": 2.0},
+    "kabanosy wieprzowe": {"kcal": 480, "p": 25.0, "f": 40.0, "c": 4.0},
+    "kaszanka": {"kcal": 210, "p": 10.0, "f": 15.0, "c": 9.0},
+    "pasztet pieczony": {"kcal": 350, "p": 14.0, "f": 30.0, "c": 4.0},
 }
