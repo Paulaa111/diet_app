@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import requests
+import time
 import re
 from datetime import date, timedelta
 from database import MY_FOOD_DB
@@ -163,7 +164,7 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
 # GEMINI — klasyfikacja składników
 # ---------------------------------------------------------------
 def classify_with_gemini(food_description: str, api_key: str) -> list:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     prompt = f"""Jesteś ekspertem ds. żywienia. Dostajesz opis posiłku po polsku.
 Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
 [
@@ -204,18 +205,23 @@ Opis posiłku: {food_description}"""
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512}
     }
-    resp = requests.post(url, json=payload, timeout=20)
-    resp.raise_for_status()
-    raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    raw = raw.replace("```json", "").replace("```", "").strip()
-    start, end = raw.find("["), raw.rfind("]") + 1
-    return json.loads(raw[start:end])
+    for attempt in range(3):
+        resp = requests.post(url, json=payload, timeout=20)
+        if resp.status_code == 429:
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s
+            continue
+        resp.raise_for_status()
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        start, end = raw.find("["), raw.rfind("]") + 1
+        return json.loads(raw[start:end])
+    raise Exception("Gemini API: zbyt wiele zapytań, spróbuj za chwilę.")
 
 # ---------------------------------------------------------------
 # GEMINI — fallback kalkulator dla pojedynczego składnika
 # ---------------------------------------------------------------
 def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     prompt = (
         f"Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g. "
         f"Zwróć TYLKO czysty JSON (bez tekstu, bez markdown): "
@@ -226,8 +232,13 @@ def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dic
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
     }
     try:
-        resp = requests.post(url, json=payload, timeout=15)
-        resp.raise_for_status()
+        for attempt in range(3):
+            resp = requests.post(url, json=payload, timeout=15)
+            if resp.status_code == 429:
+                time.sleep(2 ** attempt)
+                continue
+            resp.raise_for_status()
+            break
         raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
         start, end = raw.find("{"), raw.rfind("}") + 1
