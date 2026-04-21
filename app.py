@@ -109,8 +109,6 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
       1. Dokładne dopasowanie klucza
       2. Klucz bazy zawiera się w nazwie AI LUB nazwa AI zawiera się w kluczu
          — ale TYLKO jeśli dopasowany fragment ma >= 2 słowa lub >= 8 znaków
-           (żeby "chleb" nie łapał "chleb pszenny" jako "chleb z otrębami")
-    Poziom 3 (wspólne słowa) usunięty — był przyczyną błędów.
     """
     name_lower = name_ai.lower().strip()
 
@@ -128,19 +126,17 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
 
     # Poziom 2 — częściowe dopasowanie (ostrożne)
     best_key    = None
-    best_length = 0  # im dłuższy dopasowany fragment, tym lepiej
+    best_length = 0
 
     for key in MY_FOOD_DB:
         matched_fragment = None
 
         if key in name_lower:
-            matched_fragment = key          # klucz bazy zawiera się w nazwie AI
+            matched_fragment = key
         elif name_lower in key:
-            matched_fragment = name_lower   # nazwa AI zawiera się w kluczu bazy
+            matched_fragment = name_lower
 
         if matched_fragment:
-            # Akceptuj tylko jeśli fragment jest wystarczająco specyficzny:
-            # przynajmniej 2 słowa LUB przynajmniej 8 znaków
             words = matched_fragment.split()
             if len(words) >= 2 or len(matched_fragment) >= 8:
                 if len(matched_fragment) > best_length:
@@ -161,10 +157,37 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
     }
 
 # ---------------------------------------------------------------
+# GEMINI — helpery
+# ---------------------------------------------------------------
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
+def _gemini_headers(api_key: str) -> dict:
+    """Zwraca nagłówki HTTP dla Gemini API (klucz w nagłówku, nie w URL)."""
+    return {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
+
+def _gemini_post(payload: dict, api_key: str, timeout: int = 20) -> dict:
+    """Wysyła żądanie do Gemini z obsługą rate-limit (429) i zwraca sparsowany JSON."""
+    for attempt in range(3):
+        resp = requests.post(
+            GEMINI_URL,
+            headers=_gemini_headers(api_key),
+            json=payload,
+            timeout=timeout,
+        )
+        if resp.status_code == 429:
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise Exception("Gemini API: zbyt wiele zapytań, spróbuj za chwilę.")
+
+# ---------------------------------------------------------------
 # GEMINI — klasyfikacja składników
 # ---------------------------------------------------------------
 def classify_with_gemini(food_description: str, api_key: str) -> list:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     prompt = f"""Jesteś ekspertem ds. żywienia. Dostajesz opis posiłku po polsku.
 Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
 [
@@ -203,25 +226,18 @@ Opis posiłku: {food_description}"""
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512}
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512},
     }
-    for attempt in range(3):
-        resp = requests.post(url, json=payload, timeout=20)
-        if resp.status_code == 429:
-            time.sleep(2 ** attempt)  # 1s, 2s, 4s
-            continue
-        resp.raise_for_status()
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        start, end = raw.find("["), raw.rfind("]") + 1
-        return json.loads(raw[start:end])
-    raise Exception("Gemini API: zbyt wiele zapytań, spróbuj za chwilę.")
+    raw_json = _gemini_post(payload, api_key)
+    raw = raw_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+    raw = raw.replace("```json", "").replace("```", "").strip()
+    start, end = raw.find("["), raw.rfind("]") + 1
+    return json.loads(raw[start:end])
 
 # ---------------------------------------------------------------
 # GEMINI — fallback kalkulator dla pojedynczego składnika
 # ---------------------------------------------------------------
 def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     prompt = (
         f"Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g. "
         f"Zwróć TYLKO czysty JSON (bez tekstu, bez markdown): "
@@ -229,17 +245,11 @@ def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dic
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100},
     }
     try:
-        for attempt in range(3):
-            resp = requests.post(url, json=payload, timeout=15)
-            if resp.status_code == 429:
-                time.sleep(2 ** attempt)
-                continue
-            resp.raise_for_status()
-            break
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        raw_json = _gemini_post(payload, api_key, timeout=15)
+        raw = raw_json["candidates"][0]["content"]["parts"][0]["text"].strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
         start, end = raw.find("{"), raw.rfind("}") + 1
         data = json.loads(raw[start:end])
@@ -320,7 +330,6 @@ def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") 
             resp.raise_for_status()
             foods = resp.json().get("foods", [])
             for food in foods:
-                # Bezpieczne budowanie słownika — pomijamy wpisy bez nazwy lub z wartością niebędącą liczbą
                 nutrients = {}
                 for n in food.get("foodNutrients", []):
                     if not isinstance(n, dict):
@@ -358,11 +367,10 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
     sources_used   = []
     fallback_items = []
 
-    # Rozsądne limity gramatur na 1 porcję (zapobiega absurdalnym wartościom od Groqa)
     MAX_GRAMS = {
-        "chleb":      300,   # max 3-4 kromki
-        "masło":       30,   # max 2 łyżki
-        "finuu":       30,   # max 2 łyżki
+        "chleb":      300,
+        "masło":       30,
+        "finuu":       30,
         "margaryna":   30,
         "olej":        30,
         "oliwa":       30,
@@ -373,12 +381,11 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
         "jogurt":     300,
         "mleko":      300,
         "ser":        100,
-        "jajko":      180,   # max 3 jajka
-        "default":   1000,   # domyślny limit
+        "jajko":      180,
+        "default":   1000,
     }
 
     def sanitize_amount(name: str, amount: float) -> float:
-        """Koryguje absurdalne gramatury — AI czasem zwraca np. 800g chleba."""
         name_l = name.lower()
         for keyword, max_g in MAX_GRAMS.items():
             if keyword == "default":
@@ -387,7 +394,6 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
                 if amount > max_g:
                     return max_g
                 return amount
-        # Domyślnie: nic powyżej 1kg nie ma sensu dla 1 porcji
         return min(amount, MAX_GRAMS["default"])
 
     for item in items:
@@ -412,7 +418,7 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
                 if not result:
                     result = fetch_from_off(name_ai, amount)
 
-        # 3️⃣ Ostateczny fallback — Groq szacuje
+        # 3️⃣ Ostateczny fallback — Gemini szacuje
         if not result:
             result = gemini_estimate_single(name_ai, amount, api_key)
 
@@ -493,6 +499,7 @@ with st.sidebar:
     st.markdown("3️⃣ 🟠 **USDA** — surowce")
     st.markdown("4️⃣ 🤖 **Gemini** — ostateczny fallback")
     st.markdown("---")
+    st.markdown("**Model:** gemini-2.5-flash")
     st.markdown("**Arkusz:** Dziennik Kalorii")
     if st.button("🔄 Odśwież dane"):
         st.cache_resource.clear()
