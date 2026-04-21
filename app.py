@@ -96,7 +96,6 @@ def delete_meal_by_row(row_number):
 # ---------------------------------------------------------------
 # LOKALNA BAZA — słownik aliasów → klucz w MY_FOOD_DB
 # ---------------------------------------------------------------
-# Wszystkie warianty nazw które mama może wpisać → dokładny klucz w database.py
 ALIASES = {
     # chleb
     "chleb z otrębami":          "chleb z otrębami",
@@ -110,6 +109,10 @@ ALIASES = {
     "chleb własny":              "chleb z otrębami",
     "chleb wlasny":              "chleb z otrębami",
     "chleb domowy":              "chleb z otrębami",
+    "chleb żytni":               "chleb żytni",
+    "chleb zytni":               "chleb żytni",
+    "kromka chleba":             "chleb z otrębami",
+    "kromki chleba":             "chleb z otrębami",
     # tłuszcze
     "finuu klasyczne":           "finuu klasyczne",
     "finuu lekkie":              "finuu lekkie",
@@ -138,8 +141,9 @@ ALIASES = {
     "skyr naturalny":            "skyr naturalny",
     "skyr":                      "skyr naturalny",
     "twaróg półtłusty":          "twaróg półtłusty",
-    "twarog":                    "twaróg półtłusty",
+    "twarog półtłusty":          "twaróg półtłusty",
     "twaróg":                    "twaróg półtłusty",
+    "twarog":                    "twaróg półtłusty",
     "mleko 2%":                  "mleko 2%",
     "mleko":                     "mleko 2%",
     # napoje
@@ -148,61 +152,71 @@ ALIASES = {
     "herbata":                   "herbata",
 }
 
-# Domyślna porcja (gramy) dla 1 sztuki / 1 jednostki
+# Domyślna gramatura dla JEDNEJ sztuki/jednostki (w gramach)
 UNIT_GRAMS = {
     "chleb z otrębami":          80,   # 1 kromka
-    "chleb żytni":               80,
-    "bułka pszenna":            100,
-    "finuu klasyczne":           10,   # 1 łyżeczka smarowania
-    "finuu lekkie":              10,
-    "masło ekstra":              10,
+    "chleb żytni":               80,   # 1 kromka
+    "bułka pszenna":            100,   # 1 sztuka
+    "finuu klasyczne":           10,   # 1 łyżeczka
+    "finuu lekkie":              10,   # 1 łyżeczka
+    "masło ekstra":              10,   # 1 łyżeczka
     "jajko kurze":               60,   # 1 sztuka
-    "jajko sadzone":             60,
-    "jogurt naturalny piątnica 2%": 150,
-    "jogurt naturalny piątnica 0%": 150,
-    "skyr naturalny":           150,
-    "twaróg półtłusty":         100,
-    "mleko 2%":                 200,
-    "kawa czarna":              150,
-    "herbata":                  200,
+    "jajko sadzone":             60,   # 1 sztuka
+    "jogurt naturalny piątnica 2%": 150,  # 1 kubeczek
+    "jogurt naturalny piątnica 0%": 150,  # 1 kubeczek
+    "skyr naturalny":           150,   # 1 kubeczek
+    "twaróg półtłusty":         100,   # standardowa porcja
+    "mleko 2%":                 200,   # 1 szklanka
+    "kawa czarna":              150,   # 1 kubek
+    "herbata":                  200,   # 1 szklanka
 }
 
 def parse_locally(text: str) -> list:
     """
     Rozpoznaje składniki z tekstu BEZ AI.
-    Zwraca listę itemów — pustą jeśli nic nie znalazło.
-
-    Kluczowe poprawki vs poprzednia wersja:
-    - NIE nadpisuje ilości z DEFAULT_PORTIONS — mnoży jednostkę * liczbę
-    - Zwraca TYLKO znalezione składniki (resztę przetwórzy Gemini osobno)
-    - Sprawdza gramy jawnie podane przez użytkownika (np. "150g jogurtu")
+    Zwraca listę itemów z prawidłowo wyliczoną gramaturą.
     """
     found   = []
-    used_up = set()   # indeksy znaków już użyte — unikamy podwójnego trafienia
-
+    used_up = set()
     t = text.lower()
 
-    # Sortuj aliasy od najdłuższych do najkrótszych (jajko sadzone przed jajko)
+    # Sortuj aliasy od najdłuższych do najkrótszych
     for alias in sorted(ALIASES.keys(), key=len, reverse=True):
         pos = t.find(alias)
         if pos == -1:
             continue
         if any(pos <= u < pos + len(alias) for u in used_up):
-            continue   # ten fragment już użyty
+            continue
 
         db_key = ALIASES[alias]
         unit_g = UNIT_GRAMS.get(db_key, 100)
 
-        # Szukaj jawnej gramatury: "150g jogurtu" lub "jogurt 150g"
-        gram_match = re.search(r"(\d+)\s*g\b", t[max(0, pos-10):pos+len(alias)+10])
+        # Szukaj jawnej gramatury: "150g jogurtu"
+        # Sprawdź w okolicy aliasu (10 znaków przed i 10 po)
+        search_start = max(0, pos - 10)
+        search_end = min(len(t), pos + len(alias) + 10)
+        context = t[search_start:search_end]
+        
+        gram_match = re.search(r"(\d+)\s*g\b", context)
         if gram_match:
             amount = float(gram_match.group(1))
         else:
-            # Szukaj liczby sztuk PRZED aliasem: "2 jajka", "3 kromki chleba"
-            count_match = re.search(r"(\d+)\s*(?:kromk[aięi]|sztuk[aię]|szt\.?\s*)?$",
-                                    t[max(0, pos-15):pos])
-            count  = int(count_match.group(1)) if count_match else 1
+            # Szukaj liczby sztuk PRZED aliasem
+            before_alias = t[max(0, pos-20):pos]
+            # Wzorzec dla liczby + jednostki (kromki, sztuki, itp.)
+            count_match = re.search(r"(\d+)\s*(?:kromk[aię]|kromkę|kromki|sztuk[aię]|szt\.?\s*|sztuki|sztukę)?\s*$", before_alias)
+            
+            if count_match:
+                count = int(count_match.group(1))
+            else:
+                # Szukaj samej liczby
+                simple_count = re.search(r"(\d+)\s*$", before_alias)
+                count = int(simple_count.group(1)) if simple_count else 1
+            
             amount = unit_g * count
+
+        # Zabezpieczenie przed absurdalnymi wartościami
+        amount = max(5.0, min(amount, 2000.0))
 
         found.append({
             "item":     db_key,
@@ -210,7 +224,7 @@ def parse_locally(text: str) -> list:
             "source":   "LOCAL",
             "eng_name": db_key,
         })
-        # Zaznacz użyte znaki
+        
         for i in range(pos, pos + len(alias)):
             used_up.add(i)
 
@@ -239,7 +253,7 @@ def _gemini_post(prompt: str, api_key: str, max_tokens: int = 512) -> str:
                     continue
                 if resp.status_code in (404, 503):
                     time.sleep(2)
-                    break   # spróbuj następny model
+                    break
                 resp.raise_for_status()
                 return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
             except Exception as e:
@@ -258,7 +272,7 @@ def _parse_json_dict(raw: str) -> dict:
     return json.loads(raw[s:e])
 
 # ---------------------------------------------------------------
-# GEMINI — klasyfikacja (tylko dla składników nieznanych lokalnie)
+# GEMINI — klasyfikacja
 # ---------------------------------------------------------------
 def classify_with_gemini(food_description: str, api_key: str) -> list:
     prompt = (
@@ -279,7 +293,7 @@ def classify_with_gemini(food_description: str, api_key: str) -> list:
     return _parse_json_list(raw)
 
 # ---------------------------------------------------------------
-# GEMINI — szacowanie kalorii dla 1 składnika (ostateczny fallback)
+# GEMINI — szacowanie kalorii
 # ---------------------------------------------------------------
 def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
     prompt = (
@@ -300,18 +314,19 @@ def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dic
         return None
 
 # ---------------------------------------------------------------
-# BAZA LOKALNA — wyszukiwanie po kluczu
+# BAZA LOKALNA
 # ---------------------------------------------------------------
 def lookup_in_db(db_key: str, amount_g: float) -> dict | None:
     """Szuka dokładnie po kluczu w MY_FOOD_DB."""
     v = MY_FOOD_DB.get(db_key)
     if not v:
-        # Spróbuj też przez ALIASES (Gemini może zwrócić lekko inną nazwę)
         resolved = ALIASES.get(db_key.lower())
         if resolved:
             v = MY_FOOD_DB.get(resolved)
     if not v:
         return None
+    
+    # WAŻNE: Zakładamy że wartości w bazie są na 100g
     f = amount_g / 100
     return {
         "calories": round(v["kcal"] * f),
@@ -394,49 +409,56 @@ def fetch_from_usda(eng_name: str, amount_g: float,
         return None
 
 # ---------------------------------------------------------------
-# ORKIESTRACJA
+# ORKIESTRACJA - GŁÓWNA FUNKCJA
 # ---------------------------------------------------------------
 def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
-    # Krok 1: Rozpoznaj lokalnie co się da
-    local_items  = parse_locally(food_description)
-    local_keys   = {it["item"] for it in local_items}
+    # Krok 1: Rozpoznaj lokalnie
+    local_items = parse_locally(food_description)
+    local_keys = {it["item"] for it in local_items}
 
-    # Krok 2: Jeśli cokolwiek zostało nierozpoznane — zapytaj Gemini o CAŁY opis
-    # (Gemini zwróci też lokalnie znane, ale użyjemy tylko te których nie ma lokalnie)
+    # Krok 2: Gemini dla nierozpoznanych składników
     gemini_items = []
-    # Sprawdź czy opis zawiera coś poza lokalnymi słowami kluczowymi
     temp = food_description.lower()
     for alias in ALIASES:
         temp = temp.replace(alias, "")
     has_unknown = bool(re.sub(r"[\d\s,gz./]", "", temp).strip())
 
-    if has_unknown:
+    if has_unknown and api_key:
         try:
             all_gemini = classify_with_gemini(food_description, api_key)
-            # Weź tylko składniki których nie ma w lokalnym parsowaniu
             gemini_items = [it for it in all_gemini
                             if it.get("item", "").lower() not in local_keys
-                            and ALIASES.get(it.get("item","").lower()) not in local_keys]
+                            and ALIASES.get(it.get("item", "").lower()) not in local_keys]
         except Exception as e:
             st.warning(f"⚠️ Gemini niedostępny: {e}. Używam tylko lokalnej bazy.")
 
     items = local_items + gemini_items
 
-    total          = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
-    sources_used   = []
+    # Jeśli nic nie znaleziono, spróbuj całość przez Gemini
+    if not items and api_key:
+        try:
+            items = classify_with_gemini(food_description, api_key)
+        except Exception:
+            pass
+
+    total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
+    sources_used = []
     fallback_items = []
 
     for item in items:
-        name_ai  = item.get("item", "").lower().strip()
-        raw_amt  = item.get("amount", 100)
+        name_ai = item.get("item", "").lower().strip()
+        raw_amt = item.get("amount", 100)
+        
+        # Pobierz gramaturę
         try:
             amount = float(re.sub(r"[^0-9.]", "", str(raw_amt)) or "100")
         except Exception:
             amount = 100.0
-        # Zabezpieczenie przed absurdalnymi gramaturami
-        amount = max(5.0, min(amount, 800.0))
+        
+        # Zabezpieczenie - ale z większym limitem (dla 2 kromek chleba = 160g)
+        amount = max(5.0, min(amount, 2000.0))
 
-        source   = item.get("source", "USDA")
+        source = item.get("source", "USDA")
         eng_name = item.get("eng_name", name_ai)
 
         # 1️⃣ Własna baza
@@ -450,26 +472,26 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
                 result = fetch_from_usda(eng_name, amount, usda_key) or fetch_from_off(name_ai, amount)
 
         # 3️⃣ Gemini szacuje
-        if not result:
+        if not result and api_key:
             result = gemini_estimate_single(name_ai, amount, api_key)
 
         if result:
             total["calories"] += result["calories"]
-            total["protein"]  += result["protein"]
-            total["fat"]      += result["fat"]
-            total["carbs"]    += result["carbs"]
+            total["protein"] += result["protein"]
+            total["fat"] += result["fat"]
+            total["carbs"] += result["carbs"]
             sources_used.append(f"{name_ai} ({amount:.0f}g) → {result['source_label']}")
         else:
             fallback_items.append(f"{name_ai} ({amount:.0f}g) — brak danych")
 
     return {
-        "name":         food_description[:60],
-        "calories":     total["calories"],
-        "protein":      round(total["protein"], 1),
-        "fat":          round(total["fat"], 1),
-        "carbs":        round(total["carbs"], 1),
+        "name": food_description[:60],
+        "calories": total["calories"],
+        "protein": round(total["protein"], 1),
+        "fat": round(total["fat"], 1),
+        "carbs": round(total["carbs"], 1),
         "sources_used": sources_used,
-        "fallback":     fallback_items,
+        "fallback": fallback_items,
     }
 
 # ---------------------------------------------------------------
@@ -498,12 +520,12 @@ st.markdown("""
 # ---------------------------------------------------------------
 st.markdown('<div class="main-title">🥑 Dziennik Makro</div>', unsafe_allow_html=True)
 
-history     = load_data()
+history = load_data()
 today_meals = [m for m in history if m["date"] == str(date.today())]
-total_kcal  = sum(m["calories"] for m in today_meals)
-total_p     = sum(m.get("protein", 0) for m in today_meals)
-total_f     = sum(m.get("fat", 0) for m in today_meals)
-total_c     = sum(m.get("carbs", 0) for m in today_meals)
+total_kcal = sum(m["calories"] for m in today_meals)
+total_p = sum(m.get("protein", 0) for m in today_meals)
+total_f = sum(m.get("fat", 0) for m in today_meals)
+total_c = sum(m.get("carbs", 0) for m in today_meals)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_kcal}</div><div class="stat-label">Kcal</div></div>', unsafe_allow_html=True)
@@ -511,13 +533,13 @@ with c2: st.markdown(f'<div class="stat-box"><div class="stat-value" style="colo
 with c3: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#bc6c25">{total_f:.0f}g</div><div class="stat-label">Tłuszcz</div></div>', unsafe_allow_html=True)
 with c4: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#4299e1">{total_c:.0f}g</div><div class="stat-label">Węgle</div></div>', unsafe_allow_html=True)
 with c5:
-    rem   = LIMIT_KCAL - total_kcal
+    rem = LIMIT_KCAL - total_kcal
     color = "#6b8e23" if rem >= 0 else "#e53e3e"
     st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:{color}">{rem}</div><div class="stat-label">Zostało</div></div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### ⚙️ Ustawienia")
-    api_key  = st.secrets.get("GEMINI_API_KEY", "") or st.text_input("Klucz Gemini API", type="password")
+    api_key = st.secrets.get("GEMINI_API_KEY", "") or st.text_input("Klucz Gemini API", type="password")
     usda_key = st.secrets.get("USDA_API_KEY", "DEMO_KEY")
     st.markdown("---")
     st.markdown("**Źródła (kolejność):**")
@@ -543,14 +565,14 @@ with st.form("meal_form", clear_on_submit=True):
 if submitted and food_input:
     with st.spinner("🔍 Analizuję…"):
         try:
-            result  = get_nutrition_hybrid(food_input, api_key, usda_key)
+            result = get_nutrition_hybrid(food_input, api_key, usda_key)
             new_meal = {
-                "name":     result["name"],
+                "name": result["name"],
                 "calories": result["calories"],
-                "protein":  result["protein"],
-                "fat":      result["fat"],
-                "carbs":    result["carbs"],
-                "time":     meal_time,
+                "protein": result["protein"],
+                "fat": result["fat"],
+                "carbs": result["carbs"],
+                "time": meal_time,
             }
             save_meal(new_meal)
             st.cache_resource.clear()
@@ -575,14 +597,14 @@ if today_meals:
         if cat_meals:
             st.write(f"**{cat}**")
             for m in cat_meals:
-                c1, c2 = st.columns([8, 1])
-                with c1:
+                col1, col2 = st.columns([8, 1])
+                with col1:
                     st.markdown(
                         f'<div class="meal-card"><span>{m["name"]}</span>'
                         f'<span class="meal-stats">{m["calories"]} kcal | '
                         f'B:{m["protein"]:.0f}g T:{m["fat"]:.0f}g W:{m["carbs"]:.0f}g'
                         f'</span></div>', unsafe_allow_html=True)
-                with c2:
+                with col2:
                     if st.button("🗑️", key=f"del_{m['_row']}"):
                         delete_meal_by_row(m["_row"])
                         st.cache_resource.clear()
@@ -612,7 +634,7 @@ st.markdown('<div class="section-header">Podsumowanie Tygodnia</div>', unsafe_al
 if history:
     week_data = {}
     for i in range(6, -1, -1):
-        d   = date.today() - timedelta(days=i)
+        d = date.today() - timedelta(days=i)
         week_data[d.strftime("%d.%m")] = sum(
             m["calories"] for m in history if m["date"] == str(d))
     st.bar_chart(week_data)
