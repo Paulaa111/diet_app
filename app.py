@@ -242,16 +242,17 @@ Zasady:
 - source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Piątnica, Finuu, Oreo itp.)
 - source="USDA" → surowce, warzywa, owoce, mięso, nabiał bez marki, dania domowe
 - Każdy składnik to OSOBNY obiekt w tablicy
-- amount ZAWSZE w gramach (liczba całkowita):
-    1 kromka = 80g
-    1 plasterek = 40g
-    1 jajko = 60g
-    1 łyżka = 15g
-    1 łyżeczka = 5g
-    1 szklanka = 240g
-    kubek = 250g
-    porcja zupy = 350g
-    filiżanka kawy = 150g
+- amount ZAWSZE jako CZYSTA LICZBA CAŁKOWITA (np. 80, nie "80g", nie "80 g"):
+    1 kromka = 80
+    1 plasterek = 40
+    1 jajko = 60
+    1 łyżka = 15
+    1 łyżeczka = 5
+    1 szklanka = 240
+    kubek = 250
+    porcja zupy = 350
+    filiżanka kawy = 150
+    porcja finuu/masła = 10 (1 łyżeczka do smarowania)
 - NIE sumuj składników w jeden obiekt — każdy produkt osobno
 - eng_name: konkretny np. "natural yogurt", "chicken breast", "boiled potato"
 
@@ -437,7 +438,15 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
 
     for item in items:
         name_ai  = item.get("item", "").lower()
-        amount   = sanitize_amount(name_ai, float(item.get("amount", 100)))
+        # Bezpieczne parsowanie amount — Gemini czasem zwraca "80g" zamiast 80
+        raw_amount = item.get("amount", 100)
+        try:
+            # Usuń wszystkie nie-liczbowe znaki ("80g" → "80", "1.5" → "1.5")
+            amount_clean = re.sub(r"[^0-9.]", "", str(raw_amount))
+            amount = float(amount_clean) if amount_clean else 100.0
+        except (ValueError, TypeError):
+            amount = 100.0
+        amount = sanitize_amount(name_ai, amount)
         source   = item.get("source", "USDA")
         eng_name = item.get("eng_name", name_ai)
 
