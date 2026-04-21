@@ -285,12 +285,20 @@ def classify_with_gemini(food_description: str, api_key: str) -> list:
     start, end = raw.find("["), raw.rfind("]") + 1
     items_list = json.loads(raw[start:end])
 
+    # DEBUG — pokaż co Gemini zwrócił (można usunąć po naprawieniu błędów)
+    st.sidebar.markdown("**🔎 DEBUG — Gemini zwrócił:**")
+    for it in items_list:
+        st.sidebar.code(f"item: '{it.get('item')}' | amount: {it.get('amount')}")
+
     # Nadpisz amount domyślną porcją dla znanych produktów
     # (zabezpieczenie przed halucynacjami Gemini w gramaturach)
     for it in items_list:
         name_l = it.get("item", "").lower().strip()
         if name_l in DEFAULT_PORTIONS:
+            st.sidebar.caption(f"✅ Nadpisuję amount: {name_l} → {DEFAULT_PORTIONS[name_l]}g")
             it["amount"] = DEFAULT_PORTIONS[name_l]
+        else:
+            st.sidebar.caption(f"⚠️ Brak w DEFAULT_PORTIONS: '{name_l}'")
 
     return items_list
 
