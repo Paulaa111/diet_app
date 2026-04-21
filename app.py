@@ -104,49 +104,59 @@ def delete_meal_by_row(row_number):
 def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
     """
     Szuka produktu w MY_FOOD_DB.
-    Trzy poziomy dopasowania (od najdokładniejszego):
+    Dwa poziomy dopasowania — celowo ostrożne żeby uniknąć fałszywych trafień:
       1. Dokładne dopasowanie klucza
-      2. Klucz bazy zawiera się w nazwie AI lub odwrotnie
-      3. Przynajmniej 2 wspólne słowa (lub 1 słowo >= 5 liter)
+      2. Klucz bazy zawiera się w nazwie AI LUB nazwa AI zawiera się w kluczu
+         — ale TYLKO jeśli dopasowany fragment ma >= 2 słowa lub >= 8 znaków
+           (żeby "chleb" nie łapał "chleb pszenny" jako "chleb z otrębami")
+    Poziom 3 (wspólne słowa) usunięty — był przyczyną błędów.
     """
     name_lower = name_ai.lower().strip()
 
-    # Poziom 1 — dokładne
+    # Poziom 1 — dokładne dopasowanie
     if name_lower in MY_FOOD_DB:
-        match_key = name_lower
-    else:
-        match_key = None
+        db_val = MY_FOOD_DB[name_lower]
+        factor = amount_g / 100
+        return {
+            "calories": round(db_val["kcal"] * factor),
+            "protein":  round(db_val["p"] * factor, 1),
+            "fat":      round(db_val["f"] * factor, 1),
+            "carbs":    round(db_val["c"] * factor, 1),
+            "source_label": f"🏠 Moja baza ({name_lower})",
+        }
 
-        # Poziom 2 — jeden zawiera się w drugim
-        for key in MY_FOOD_DB:
-            if key in name_lower or name_lower in key:
-                match_key = key
-                break
+    # Poziom 2 — częściowe dopasowanie (ostrożne)
+    best_key    = None
+    best_length = 0  # im dłuższy dopasowany fragment, tym lepiej
 
-        # Poziom 3 — wspólne słowa (pomija krótkie spójniki)
-        if not match_key:
-            name_words = {w for w in name_lower.split() if len(w) >= 4}
-            best_overlap = 0
-            for key in MY_FOOD_DB:
-                key_words = {w for w in key.split() if len(w) >= 4}
-                overlap = len(name_words & key_words)
-                if overlap > best_overlap:
-                    best_overlap = overlap
-                    match_key = key
-            if best_overlap == 0:
-                match_key = None
+    for key in MY_FOOD_DB:
+        matched_fragment = None
 
-    if not match_key:
+        if key in name_lower:
+            matched_fragment = key          # klucz bazy zawiera się w nazwie AI
+        elif name_lower in key:
+            matched_fragment = name_lower   # nazwa AI zawiera się w kluczu bazy
+
+        if matched_fragment:
+            # Akceptuj tylko jeśli fragment jest wystarczająco specyficzny:
+            # przynajmniej 2 słowa LUB przynajmniej 8 znaków
+            words = matched_fragment.split()
+            if len(words) >= 2 or len(matched_fragment) >= 8:
+                if len(matched_fragment) > best_length:
+                    best_length = len(matched_fragment)
+                    best_key = key
+
+    if not best_key:
         return None
 
-    db_val = MY_FOOD_DB[match_key]
+    db_val = MY_FOOD_DB[best_key]
     factor = amount_g / 100
     return {
         "calories": round(db_val["kcal"] * factor),
         "protein":  round(db_val["p"] * factor, 1),
         "fat":      round(db_val["f"] * factor, 1),
         "carbs":    round(db_val["c"] * factor, 1),
-        "source_label": f"🏠 Moja baza ({match_key})",
+        "source_label": f"🏠 Moja baza ({best_key})",
     }
 
 # ---------------------------------------------------------------
@@ -173,6 +183,12 @@ Zasady:
 - amount w gramach: 1 kromka=80g, 1 plasterek=40g, 1 jajko=60g, 1 szklanka=240g, 1 łyżka=15g, 1 łyżeczka=5g, kubek=250g, porcja zupy=350g
 - eng_name: konkretny np. "natural yogurt", "chicken breast grilled", "boiled potato"
 - item: podaj możliwie pełną nazwę produktu — np. 'kotlet schabowy', 'pierogi ruskie', 'jajko sadzone'
+
+WAŻNE — specjalne mapowania (zawsze używaj dokładnie tej nazwy w polu "item"):
+- "mój chleb", "kromka mojego chleba", "chleb twarogowy", "chleb własny", "chleb z otrębami i twarogiem", "chleb domowy" → item = "chleb z otrębami"
+- "finuu", "margaryna finuu" → item = "finuu klasyczne" (chyba że użytkownik napisał "lekkie")
+- "jajko", "jajka", "jajeczko" → item = "jajko kurze"
+- "jajko sadzone", "jajka sadzone" → item = "jajko sadzone"
 """
     payload = {
         "model": "llama-3.3-70b-versatile",
