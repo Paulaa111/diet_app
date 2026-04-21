@@ -159,7 +159,15 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
 # ---------------------------------------------------------------
 # GEMINI — helpery
 # ---------------------------------------------------------------
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+# Lista modeli — próbujemy po kolei gdy poprzedni jest niedostępny
+GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash-001",  # starszy ale stabilny
+]
+
+def _gemini_url(model: str) -> str:
+    return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 def _gemini_headers(api_key: str) -> dict:
     """Zwraca nagłówki HTTP dla Gemini API (klucz w nagłówku, nie w URL)."""
@@ -168,21 +176,39 @@ def _gemini_headers(api_key: str) -> dict:
         "x-goog-api-key": api_key,
     }
 
-def _gemini_post(payload: dict, api_key: str, timeout: int = 20) -> dict:
-    """Wysyła żądanie do Gemini z obsługą rate-limit (429) i zwraca sparsowany JSON."""
-    for attempt in range(3):
-        resp = requests.post(
-            GEMINI_URL,
-            headers=_gemini_headers(api_key),
-            json=payload,
-            timeout=timeout,
-        )
-        if resp.status_code == 429:
-            time.sleep(2 ** attempt)  # 1s, 2s, 4s
-            continue
-        resp.raise_for_status()
-        return resp.json()
-    raise Exception("Gemini API: zbyt wiele zapytań, spróbuj za chwilę.")
+def _gemini_post(payload: dict, api_key: str, timeout: int = 30) -> dict:
+    """
+    Wysyła żądanie do Gemini.
+    Próbuje kolejno modele z GEMINI_MODELS.
+    Obsługuje 429 (rate limit) i 503 (przeciążenie serwera).
+    """
+    last_error = None
+    for model in GEMINI_MODELS:
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    _gemini_url(model),
+                    headers=_gemini_headers(api_key),
+                    json=payload,
+                    timeout=timeout,
+                )
+                if resp.status_code == 429:
+                    time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                    continue
+                if resp.status_code == 503:
+                    time.sleep(2 ** attempt)
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except requests.exceptions.Timeout:
+                last_error = f"Timeout dla modelu {model}"
+                break  # przejdź do następnego modelu
+            except requests.exceptions.HTTPError as e:
+                last_error = str(e)
+                if resp.status_code in (400, 401, 403):
+                    raise  # błędy autoryzacji — nie próbuj innych modeli
+                break  # inny błąd HTTP — spróbuj następnego modelu
+    raise Exception(f"Gemini API niedostępne (wszystkie modele zawiodły). Ostatni błąd: {last_error}")
 
 # ---------------------------------------------------------------
 # GEMINI — klasyfikacja składników
