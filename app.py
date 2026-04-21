@@ -160,72 +160,76 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
     }
 
 # ---------------------------------------------------------------
-# GROQ — klasyfikacja składników
+# GEMINI — klasyfikacja składników
 # ---------------------------------------------------------------
-def classify_with_groq(food_description: str, api_key: str) -> list:
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    system_prompt = """Jesteś ekspertem ds. żywienia. Dostajesz opis posiłku po polsku.
+def classify_with_gemini(food_description: str, api_key: str) -> list:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    prompt = f"""Jesteś ekspertem ds. żywienia. Dostajesz opis posiłku po polsku.
 Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
 [
-  {
-    "item": "polska nazwa produktu (jak najbardziej szczegółowa, np. 'jogurt naturalny piątnica 2%')",
-    "amount": <liczba gramów jako liczba>,
-    "source": "OFF" | "USDA",
-    "eng_name": "krótka angielska nazwa do wyszukiwania w API, max 3 słowa"
-  }
+  {{
+    "item": "polska nazwa produktu (jak najbardziej szczegółowa)",
+    "amount": <liczba gramów — TYLKO liczba, bez tekstu>,
+    "source": "OFF lub USDA",
+    "eng_name": "krótka angielska nazwa, max 3 słowa"
+  }}
 ]
 
 Zasady:
-- source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Piątnica, Oreo itp.)
+- source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Piątnica, Finuu, Oreo itp.)
 - source="USDA" → surowce, warzywa, owoce, mięso, nabiał bez marki, dania domowe
-- Każdy składnik to osobny obiekt w tablicy
-- amount w gramach: 1 kromka=80g, 1 plasterek=40g, 1 jajko=60g, 1 szklanka=240g, 1 łyżka=15g, 1 łyżeczka=5g, kubek=250g, porcja zupy=350g
-- eng_name: konkretny np. "natural yogurt", "chicken breast grilled", "boiled potato"
-- item: podaj możliwie pełną nazwę produktu — np. 'kotlet schabowy', 'pierogi ruskie', 'jajko sadzone'
+- Każdy składnik to OSOBNY obiekt w tablicy
+- amount ZAWSZE w gramach (liczba całkowita):
+    1 kromka = 80g
+    1 plasterek = 40g
+    1 jajko = 60g
+    1 łyżka = 15g
+    1 łyżeczka = 5g
+    1 szklanka = 240g
+    kubek = 250g
+    porcja zupy = 350g
+    filiżanka kawy = 150g
+- NIE sumuj składników w jeden obiekt — każdy produkt osobno
+- eng_name: konkretny np. "natural yogurt", "chicken breast", "boiled potato"
 
-WAŻNE — specjalne mapowania (zawsze używaj dokładnie tej nazwy w polu "item"):
-- "mój chleb", "kromka mojego chleba", "chleb twarogowy", "chleb własny", "chleb z otrębami i twarogiem", "chleb domowy" → item = "chleb z otrębami"
-- "finuu", "margaryna finuu" → item = "finuu klasyczne" (chyba że użytkownik napisał "lekkie")
-- "jajko", "jajka", "jajeczko" → item = "jajko kurze"
+SPECJALNE MAPOWANIA — zawsze używaj dokładnie tej nazwy w polu "item":
+- "mój chleb", "kromka mojego chleba", "chleb twarogowy", "chleb własny", "chleb domowy" → item = "chleb z otrębami"
+- "finuu", "margaryna finuu" → item = "finuu klasyczne" (chyba że napisano "lekkie" → "finuu lekkie")
+- "jajko", "jajka", "jajeczko" (bez przymiotnika) → item = "jajko kurze"
 - "jajko sadzone", "jajka sadzone" → item = "jajko sadzone"
-"""
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": food_description}
-        ],
-        "temperature": 0.1,
-        "max_tokens": 512,
-    }
-    resp = requests.post(url, headers=headers, json=payload, timeout=20)
+
+Opis posiłku: {food_description}"""
+
+    payload = {{
+        "contents": [{{"parts": [{{"text": prompt}}]}}],
+        "generationConfig": {{"temperature": 0.1, "maxOutputTokens": 512}}
+    }}
+    resp = requests.post(url, json=payload, timeout=20)
     resp.raise_for_status()
-    raw = resp.json()["choices"][0]["message"]["content"].strip()
+    raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    raw = raw.replace("```json", "").replace("```", "").strip()
     start, end = raw.find("["), raw.rfind("]") + 1
     return json.loads(raw[start:end])
 
 # ---------------------------------------------------------------
-# GROQ — fallback kalkulator dla pojedynczego składnika
+# GEMINI — fallback kalkulator dla pojedynczego składnika
 # ---------------------------------------------------------------
-def groq_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+def gemini_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     prompt = (
-        f"Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g.\n"
-        f"Zwróć TYLKO czysty JSON (bez tekstu, bez markdown):\n"
-        f'{{\"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0}}'
+        f"Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g. "
+        f"Zwróć TYLKO czysty JSON (bez tekstu, bez markdown): "
+        f'{{"calories": 0, "protein": 0, "fat": 0, "carbs": 0}}'
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1,
-        "max_tokens": 100,
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
     }
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=15)
+        resp = requests.post(url, json=payload, timeout=15)
         resp.raise_for_status()
-        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
         start, end = raw.find("{"), raw.rfind("}") + 1
         data = json.loads(raw[start:end])
         return {
@@ -233,7 +237,7 @@ def groq_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict 
             "protein":  round(float(data.get("protein", 0)), 1),
             "fat":      round(float(data.get("fat", 0)), 1),
             "carbs":    round(float(data.get("carbs", 0)), 1),
-            "source_label": "🤖 Groq~szacunek",
+            "source_label": "🤖 Gemini~szacunek",
         }
     except Exception:
         return None
@@ -328,15 +332,47 @@ def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") 
 # ORKIESTRACJA — pełny pipeline
 # ---------------------------------------------------------------
 def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
-    items = classify_with_groq(food_description, api_key)
+    items = classify_with_gemini(food_description, api_key)
 
     total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
     sources_used   = []
     fallback_items = []
 
+    # Rozsądne limity gramatur na 1 porcję (zapobiega absurdalnym wartościom od Groqa)
+    MAX_GRAMS = {
+        "chleb":      300,   # max 3-4 kromki
+        "masło":       30,   # max 2 łyżki
+        "finuu":       30,   # max 2 łyżki
+        "margaryna":   30,
+        "olej":        30,
+        "oliwa":       30,
+        "sól":         10,
+        "cukier":      30,
+        "miód":        30,
+        "dżem":        40,
+        "jogurt":     300,
+        "mleko":      300,
+        "ser":        100,
+        "jajko":      180,   # max 3 jajka
+        "default":   1000,   # domyślny limit
+    }
+
+    def sanitize_amount(name: str, amount: float) -> float:
+        """Koryguje absurdalne gramatury — AI czasem zwraca np. 800g chleba."""
+        name_l = name.lower()
+        for keyword, max_g in MAX_GRAMS.items():
+            if keyword == "default":
+                continue
+            if keyword in name_l:
+                if amount > max_g:
+                    return max_g
+                return amount
+        # Domyślnie: nic powyżej 1kg nie ma sensu dla 1 porcji
+        return min(amount, MAX_GRAMS["default"])
+
     for item in items:
         name_ai  = item.get("item", "").lower()
-        amount   = float(item.get("amount", 100))
+        amount   = sanitize_amount(name_ai, float(item.get("amount", 100)))
         source   = item.get("source", "USDA")
         eng_name = item.get("eng_name", name_ai)
 
@@ -358,7 +394,7 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
 
         # 3️⃣ Ostateczny fallback — Groq szacuje
         if not result:
-            result = groq_estimate_single(name_ai, amount, api_key)
+            result = gemini_estimate_single(name_ai, amount, api_key)
 
         if result:
             total["calories"] += result["calories"]
@@ -428,14 +464,14 @@ with c5:
 # SIDEBAR
 with st.sidebar:
     st.markdown("### ⚙️ Ustawienia")
-    api_key  = st.secrets.get("GROQ_API_KEY", "") or st.text_input("Klucz Groq API", type="password")
+    api_key  = st.secrets.get("GEMINI_API_KEY", "") or st.text_input("Klucz Gemini API", type="password")
     usda_key = st.secrets.get("USDA_API_KEY", "DEMO_KEY")
     st.markdown("---")
     st.markdown("**Źródła danych (kolejność):**")
     st.markdown("1️⃣ 🏠 **Moja baza** — database.py")
     st.markdown("2️⃣ 🔵 **Open Food Facts** — marki")
     st.markdown("3️⃣ 🟠 **USDA** — surowce")
-    st.markdown("4️⃣ 🤖 **Groq** — ostateczny fallback")
+    st.markdown("4️⃣ 🤖 **Gemini** — ostateczny fallback")
     st.markdown("---")
     st.markdown("**Arkusz:** Dziennik Kalorii")
     if st.button("🔄 Odśwież dane"):
