@@ -90,94 +90,175 @@ def delete_meal_by_row(row_number):
         st.error(f"❌ Błąd usuwania: {e}")
 
 # ---------------------------------------------------------------
-# PROSTE ROZPOZNAWANIE - BEZ ŻADNYCH ZAWIŁOŚCI
+# ROZPOZNAWANIE SKŁADNIKÓW
 # ---------------------------------------------------------------
 
-# Gramatura 1 sztuki (w gramach)
+# Jednostki miary -> gramy na 1 jednostkę
 PORTIONS = {
-    "kromka": 80,
-    "kromki": 80,
-    "łyżeczka": 10,
-    "łyżka": 15,
-    "sztuka": 60,
-    "sztuki": 60,
+    "kromka":    80,
+    "kromki":    80,
+    "kromek":    80,
+    "łyżeczka":  5,
+    "łyżeczki":  5,
+    "łyżka":     15,
+    "łyżki":     15,
+    "łyżek":     15,
+    "sztuka":    60,
+    "sztuki":    60,
+    "sztuk":     60,
+    "g":         1,
+    "gram":      1,
+    "gramy":     1,
+    "gramów":    1,
+    "ml":        1,
 }
 
-# Aliasy produktów
-PRODUCTS = {
-    "chleb": "chleb z otrębami",
-    "mojego chleba": "chleb z otrębami",
-    "mój chleb": "chleb z otrębami",
-    "finuu": "finuu klasyczne",
+# Aliasy nazw produktów -> klucz w bazie danych
+ALIASES = {
+    "mojego chleba":        "chleb z otrębami",
+    "mój chleb":            "chleb z otrębami",
+    "moje chleba":          "chleb z otrębami",
+    "chleb":                "chleb z otrębami",
+    "finuu":                "finuu klasyczne",
+    "jajko":                "jajko kurze",
+    "jajka":                "jajko kurze",
+    "jaj":                  "jajko kurze",
+    "jogurt":               "jogurt naturalny piątnica 2%",
+    "twaróg":               "twaróg półtłusty",
+    "masło":                "masło ekstra",
+    "oliwa":                "oliwa z oliwek",
+    "kasza":                "kasza gryczana",
+    "ryż":                  "ryż biały",
 }
 
-def parse_meal(text):
-    """Proste parsowanie - zwraca listę (produkt, gramy)"""
-    text = text.lower()
+def resolve_product(raw: str) -> str:
+    """
+    Zamienia surowy tekst na klucz w bazie MY_FOOD_DB.
+    Kolejność: 1) bezpośrednie trafienie w bazie, 2) alias, 3) częściowe dopasowanie.
+    """
+    raw = raw.strip().lower()
+
+    # 1. Dokładne trafienie w bazie
+    if raw in MY_FOOD_DB:
+        return raw
+
+    # 2. Szukaj aliasów (od najdłuższego, żeby "mojego chleba" > "chleba")
+    for alias in sorted(ALIASES.keys(), key=len, reverse=True):
+        if alias in raw:
+            return ALIASES[alias]
+
+    # 3. Częściowe dopasowanie w kluczach bazy
+    for key in MY_FOOD_DB:
+        if key in raw or raw in key:
+            return key
+
+    # 4. Nie znaleziono
+    return raw
+
+
+def parse_meal(text: str):
+    """
+    Parsuje tekst wejściowy i zwraca listę (nazwa_produktu, gramy).
+
+    Obsługuje:
+      - "2 kromki chleba"         -> (chleb z otrębami, 160g)
+      - "2 kromki mojego chleba"  -> (chleb z otrębami, 160g)
+      - "150g ryżu"               -> (ryż biały, 150g)
+      - "łyżka finuu"             -> (finuu klasyczne, 15g)
+      - "jajko"                   -> (jajko kurze, 60g)
+    """
+    text_lower = text.lower()
     results = []
-    
-    # Szukaj wzorca: "liczba kromki produkt" lub "liczba produkt"
-    # Przykład: "2 kromki mojego chleba" lub "2 chleb"
-    
-    # Wzór 1: liczba + jednostka + produkt
-    pattern1 = r'(\d+)\s+(kromk[aię]|kromki|łyżeczk[aię]|łyżk[aię]|sztuk[aię])\s+(.+?)(?:\s+z\s+|\s*$)'
-    # Wzór 2: liczba + produkt (bez jednostki)
-    pattern2 = r'(\d+)\s+(.+?)(?:\s+z\s+|\s*$)'
-    
-    # Szukaj wszystkich dopasowań
-    for match in re.finditer(pattern1, text):
-        count = int(match.group(1))
-        unit = match.group(2)
-        product = match.group(3).strip()
-        
-        # Sprawdź czy produkt jest w aliasach
-        for alias, real_name in PRODUCTS.items():
-            if alias in product:
-                product_name = real_name
-                break
-        else:
-            product_name = product
-        
-        grams = PORTIONS.get(unit, 80) * count
-        results.append((product_name, grams))
-        
-        # Usuń przetworzony fragment
-        text = text.replace(match.group(0), "")
-    
-    # Szukaj bez jednostki
-    for match in re.finditer(pattern2, text):
-        count = int(match.group(1))
-        product = match.group(2).strip()
-        
-        # Sprawdź czy produkt jest w aliasach
-        for alias, real_name in PRODUCTS.items():
-            if alias in product:
-                product_name = real_name
-                break
-        else:
-            product_name = product
-        
-        # Domyślna porcja - 1 sztuka
-        grams = 80 * count
-        results.append((product_name, grams))
-    
+    used_spans = []
+
+    unit_pattern = "|".join(re.escape(u) for u in PORTIONS.keys())
+
+    # ----------------------------------------------------------------
+    # Wzór A: liczba + jednostka + produkt
+    # Przykład: "2 kromki mojego chleba", "150 g ryżu"
+    # ----------------------------------------------------------------
+    pattern_a = re.compile(
+        r'(\d+(?:[.,]\d+)?)\s+(' + unit_pattern + r')\s+([a-ząćęłńóśźż ]+?)(?=\s+z\s+\d|\s+i\s+|\s*,|\s*$)',
+        re.IGNORECASE | re.UNICODE
+    )
+
+    for m in pattern_a.finditer(text_lower):
+        count = float(m.group(1).replace(",", "."))
+        unit  = m.group(2).lower()
+        raw   = m.group(3).strip()
+        grams = PORTIONS[unit] * count
+        product = resolve_product(raw)
+        results.append((product, grams))
+        used_spans.append((m.start(), m.end()))
+
+    # ----------------------------------------------------------------
+    # Wzór B: jednostka (bez liczby) + produkt
+    # Przykład: "łyżka finuu", "kromka chleba"
+    # ----------------------------------------------------------------
+    pattern_b = re.compile(
+        r'\b(' + unit_pattern + r')\s+([a-ząćęłńóśźż ]+?)(?=\s+z\s+\d|\s+i\s+|\s*,|\s*$)',
+        re.IGNORECASE | re.UNICODE
+    )
+
+    for m in pattern_b.finditer(text_lower):
+        # Pomiń jeśli ten fragment już pokryty przez wzór A
+        if any(s <= m.start() < e for s, e in used_spans):
+            continue
+        # Upewnij się, że przed jednostką nie ma cyfry (bo wtedy wzór A powinien był trafić)
+        before = text_lower[:m.start()].rstrip()
+        if before and before[-1].isdigit():
+            continue
+
+        unit  = m.group(1).lower()
+        raw   = m.group(2).strip()
+        grams = PORTIONS[unit] * 1  # 1 jednostka
+        product = resolve_product(raw)
+        results.append((product, grams))
+        used_spans.append((m.start(), m.end()))
+
+    # ----------------------------------------------------------------
+    # Wzór C: liczba + produkt (brak jednostki)
+    # Przykład: "2 jajka", "3 jabłka"
+    # ----------------------------------------------------------------
+    pattern_c = re.compile(
+        r'(\d+)\s+([a-ząćęłńóśźż ]+?)(?=\s+z\s+\d|\s+i\s+|\s*,|\s*$)',
+        re.IGNORECASE | re.UNICODE
+    )
+
+    for m in pattern_c.finditer(text_lower):
+        if any(s <= m.start() < e for s, e in used_spans):
+            continue
+        count = int(m.group(1))
+        raw   = m.group(2).strip()
+        product = resolve_product(raw)
+        # Domyślna porcja jednej sztuki to 60g (można nadpisać przez bazę danych)
+        grams = 60 * count
+        results.append((product, grams))
+        used_spans.append((m.start(), m.end()))
+
+    # ----------------------------------------------------------------
+    # Wzór D: sam produkt (bez liczby i jednostki)
+    # Przykład: "finuu", "jajko"
+    # ----------------------------------------------------------------
+    if not results:
+        product = resolve_product(text_lower)
+        results.append((product, 60))  # domyślna porcja
+
     return results
 
-def calculate_nutrition(product_name, grams):
-    """Oblicza wartości odżywcze dla produktu"""
-    # Pobierz z bazy
+
+def calculate_nutrition(product_name: str, grams: float):
+    """Oblicza wartości odżywcze dla produktu na podstawie gramy."""
     data = MY_FOOD_DB.get(product_name)
     if not data:
         return None
-    
-    # Mnożnik - baza na 100g
+
     multiplier = grams / 100.0
-    
     return {
         "calories": int(round(data["kcal"] * multiplier)),
-        "protein": round(data["p"] * multiplier, 1),
-        "fat": round(data["f"] * multiplier, 1),
-        "carbs": round(data["c"] * multiplier, 1),
+        "protein":  round(data["p"] * multiplier, 1),
+        "fat":      round(data["f"] * multiplier, 1),
+        "carbs":    round(data["c"] * multiplier, 1),
     }
 
 # ---------------------------------------------------------------
@@ -203,9 +284,9 @@ st.markdown('<div class="main-title">🥑 Dziennik Makro</div>', unsafe_allow_ht
 history = load_data()
 today_meals = [m for m in history if m["date"] == str(date.today())]
 total_kcal = sum(m["calories"] for m in today_meals)
-total_p = sum(m.get("protein", 0) for m in today_meals)
-total_f = sum(m.get("fat", 0) for m in today_meals)
-total_c = sum(m.get("carbs", 0) for m in today_meals)
+total_p    = sum(m.get("protein", 0) for m in today_meals)
+total_f    = sum(m.get("fat", 0) for m in today_meals)
+total_c    = sum(m.get("carbs", 0) for m in today_meals)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_kcal}</div><div class="stat-label">Kcal</div></div>', unsafe_allow_html=True)
@@ -227,50 +308,52 @@ with st.sidebar:
 
 with st.form("meal_form", clear_on_submit=True):
     food_input = st.text_input("Co dziś zjadłaś?",
-        placeholder="np. 2 kromki mojego chleba z finuu")
+        placeholder="np. 2 kromki mojego chleba z łyżką finuu")
     meal_time = st.selectbox("Pora", ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"])
     submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
 
 if submitted and food_input:
     with st.spinner("🔍 Analizuję…"):
-        # Parsuj
         items = parse_meal(food_input)
-        
-        if not items:
-            st.error("❌ Nie rozpoznano składników. Spróbuj: '2 kromki chleba z finuu'")
+
+        total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
+        details = []
+        found_any = False
+
+        for product_name, grams in items:
+            nutrition = calculate_nutrition(product_name, grams)
+            if nutrition:
+                found_any = True
+                total["calories"] += nutrition["calories"]
+                total["protein"]  += nutrition["protein"]
+                total["fat"]      += nutrition["fat"]
+                total["carbs"]    += nutrition["carbs"]
+                details.append(f"✅ **{product_name}**: {grams:.0f}g → {nutrition['calories']} kcal | B:{nutrition['protein']}g T:{nutrition['fat']}g W:{nutrition['carbs']}g")
+            else:
+                details.append(f"⚠️ **{product_name}**: brak w bazie danych")
+
+        if not found_any:
+            st.error("❌ Nie rozpoznano żadnego składnika. Spróbuj: '2 kromki chleba z łyżką finuu'")
         else:
-            total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
-            details = []
-            
-            for product_name, grams in items:
-                nutrition = calculate_nutrition(product_name, grams)
-                if nutrition:
-                    total["calories"] += nutrition["calories"]
-                    total["protein"] += nutrition["protein"]
-                    total["fat"] += nutrition["fat"]
-                    total["carbs"] += nutrition["carbs"]
-                    details.append(f"{product_name}: {grams}g → {nutrition['calories']} kcal")
-                else:
-                    details.append(f"⚠️ {product_name}: brak w bazie")
-            
-            # Zapisz
             new_meal = {
-                "name": food_input[:50],
+                "name":     food_input[:50],
                 "calories": total["calories"],
-                "protein": total["protein"],
-                "fat": total["fat"],
-                "carbs": total["carbs"],
-                "time": meal_time,
+                "protein":  total["protein"],
+                "fat":      total["fat"],
+                "carbs":    total["carbs"],
+                "time":     meal_time,
             }
             save_meal(new_meal)
             st.cache_resource.clear()
-            
-            st.success(f"✅ {food_input[:50]} — {total['calories']} kcal | B:{total['protein']:.0f}g T:{total['fat']:.0f}g W:{total['carbs']:.0f}g")
-            with st.expander("📊 Szczegóły"):
+            st.success(f"✅ Zapisano: {total['calories']} kcal | B:{total['protein']:.0f}g T:{total['fat']:.0f}g W:{total['carbs']:.0f}g")
+            with st.expander("📊 Szczegóły składników"):
                 for d in details:
-                    st.write(d)
+                    st.markdown(d)
             st.rerun()
 
+# ---------------------------------------------------------------
+# DZISIEJSZE MENU
+# ---------------------------------------------------------------
 st.markdown('<div class="section-header">Dzisiejsze Menu</div>', unsafe_allow_html=True)
 
 if today_meals:
@@ -281,7 +364,13 @@ if today_meals:
             for m in cat_meals:
                 col1, col2 = st.columns([8, 1])
                 with col1:
-                    st.markdown(f'<div class="meal-card"><span>{m["name"]}</span><span>{m["calories"]} kcal | B:{m["protein"]:.0f}g T:{m["fat"]:.0f}g W:{m["carbs"]:.0f}g</span></div>', unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div class="meal-card">'
+                        f'<span>{m["name"]}</span>'
+                        f'<span>{m["calories"]} kcal | B:{m["protein"]:.0f}g T:{m["fat"]:.0f}g W:{m["carbs"]:.0f}g</span>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
                 with col2:
                     if st.button("🗑️", key=f"del_{m['_row']}"):
                         delete_meal_by_row(m["_row"])
@@ -294,6 +383,9 @@ if today_meals:
         save_daily_summary(today_meals)
         st.success("✅ Podsumowanie zapisane!")
 
+# ---------------------------------------------------------------
+# PODSUMOWANIE TYGODNIA
+# ---------------------------------------------------------------
 st.markdown('<div class="section-header">Podsumowanie Tygodnia</div>', unsafe_allow_html=True)
 if history:
     week_data = {}
