@@ -312,6 +312,9 @@ with st.form("meal_form", clear_on_submit=True):
     meal_time = st.selectbox("Pora", ["Śniadanie", "II Śniadanie", "Obiad", "Kolacja", "Przekąska"])
     submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
 
+st.write("TEST:", parse_meal("2 kromki mojego chleba"))
+st.write("TEST2:", parse_meal("łyżka finuu"))
+
 if submitted and food_input:
     with st.spinner("🔍 Analizuję…"):
         items = parse_meal(food_input)
