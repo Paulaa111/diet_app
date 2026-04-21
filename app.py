@@ -200,10 +200,10 @@ SPECJALNE MAPOWANIA — zawsze używaj dokładnie tej nazwy w polu "item":
 
 Opis posiłku: {food_description}"""
 
-    payload = {{
-        "contents": [{{"parts": [{{"text": prompt}}]}}],
-        "generationConfig": {{"temperature": 0.1, "maxOutputTokens": 512}}
-    }}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512}
+    }
     resp = requests.post(url, json=payload, timeout=20)
     resp.raise_for_status()
     raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
