@@ -161,9 +161,9 @@ def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
 # ---------------------------------------------------------------
 # Lista modeli — próbujemy po kolei gdy poprzedni jest niedostępny
 GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash-001",  # starszy ale stabilny
+    "gemini-2.5-flash",       # główny
+    "gemini-2.5-flash-lite",  # lżejszy fallback
+    "gemini-2.0-flash",       # ostateczna rezerwa
 ]
 
 def _gemini_url(model: str) -> str:
@@ -181,6 +181,7 @@ def _gemini_post(payload: dict, api_key: str, timeout: int = 30) -> dict:
     Wysyła żądanie do Gemini.
     Próbuje kolejno modele z GEMINI_MODELS.
     Obsługuje 429 (rate limit) i 503 (przeciążenie serwera).
+    Przy 503 czeka dłużej (serwer jest przeciążony) i przechodzi do następnego modelu.
     """
     last_error = None
     for model in GEMINI_MODELS:
@@ -193,22 +194,34 @@ def _gemini_post(payload: dict, api_key: str, timeout: int = 30) -> dict:
                     timeout=timeout,
                 )
                 if resp.status_code == 429:
-                    time.sleep(2 ** attempt)  # 1s, 2s, 4s
-                    continue
-                if resp.status_code == 503:
+                    # Rate limit — czekaj i spróbuj ponownie ten sam model
                     time.sleep(2 ** attempt)
                     continue
+                if resp.status_code == 503:
+                    # Serwer przeciążony — krótka przerwa, potem następny model
+                    time.sleep(3 * (attempt + 1))  # 3s, 6s, 9s
+                    if attempt == 2:
+                        break  # po 3 próbach przejdź do następnego modelu
+                    continue
+                if resp.status_code == 404:
+                    # Model nie istnieje — od razu następny
+                    last_error = f"Model {model} nie istnieje (404)"
+                    break
                 resp.raise_for_status()
                 return resp.json()
             except requests.exceptions.Timeout:
                 last_error = f"Timeout dla modelu {model}"
+                time.sleep(2)
                 break  # przejdź do następnego modelu
             except requests.exceptions.HTTPError as e:
                 last_error = str(e)
                 if resp.status_code in (400, 401, 403):
                     raise  # błędy autoryzacji — nie próbuj innych modeli
                 break  # inny błąd HTTP — spróbuj następnego modelu
-    raise Exception(f"Gemini API niedostępne (wszystkie modele zawiodły). Ostatni błąd: {last_error}")
+        else:
+            # Wszystkie 3 próby dla tego modelu zakończyły się 429
+            last_error = f"Rate limit dla modelu {model}"
+    raise Exception(f"Gemini API niedostępne. Ostatni błąd: {last_error}")
 
 # ---------------------------------------------------------------
 # GEMINI — klasyfikacja składników
