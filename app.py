@@ -18,7 +18,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
-BREAD_VALS = {"kcal": 211, "protein": 12, "fat": 5, "carbs": 25}
 LIMIT_KCAL = 1500
 
 # ---------------------------------------------------------------
@@ -100,7 +99,58 @@ def delete_meal_by_row(row_number):
         st.error(f"❌ Nie udało się usunąć wiersza: {e}")
 
 # ---------------------------------------------------------------
-# KROK 1 — GROQ: klasyfikacja składników
+# WYSZUKIWANIE W LOKALNEJ BAZIE database.py
+# ---------------------------------------------------------------
+def lookup_in_db(name_ai: str, amount_g: float) -> dict | None:
+    """
+    Szuka produktu w MY_FOOD_DB.
+    Trzy poziomy dopasowania (od najdokładniejszego):
+      1. Dokładne dopasowanie klucza
+      2. Klucz bazy zawiera się w nazwie AI lub odwrotnie
+      3. Przynajmniej 2 wspólne słowa (lub 1 słowo >= 5 liter)
+    """
+    name_lower = name_ai.lower().strip()
+
+    # Poziom 1 — dokładne
+    if name_lower in MY_FOOD_DB:
+        match_key = name_lower
+    else:
+        match_key = None
+
+        # Poziom 2 — jeden zawiera się w drugim
+        for key in MY_FOOD_DB:
+            if key in name_lower or name_lower in key:
+                match_key = key
+                break
+
+        # Poziom 3 — wspólne słowa (pomija krótkie spójniki)
+        if not match_key:
+            name_words = {w for w in name_lower.split() if len(w) >= 4}
+            best_overlap = 0
+            for key in MY_FOOD_DB:
+                key_words = {w for w in key.split() if len(w) >= 4}
+                overlap = len(name_words & key_words)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    match_key = key
+            if best_overlap == 0:
+                match_key = None
+
+    if not match_key:
+        return None
+
+    db_val = MY_FOOD_DB[match_key]
+    factor = amount_g / 100
+    return {
+        "calories": round(db_val["kcal"] * factor),
+        "protein":  round(db_val["p"] * factor, 1),
+        "fat":      round(db_val["f"] * factor, 1),
+        "carbs":    round(db_val["c"] * factor, 1),
+        "source_label": f"🏠 Moja baza ({match_key})",
+    }
+
+# ---------------------------------------------------------------
+# GROQ — klasyfikacja składników
 # ---------------------------------------------------------------
 def classify_with_groq(food_description: str, api_key: str) -> list:
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -109,7 +159,7 @@ def classify_with_groq(food_description: str, api_key: str) -> list:
 Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
 [
   {
-    "item": "polska nazwa produktu",
+    "item": "polska nazwa produktu (jak najbardziej szczegółowa, np. 'jogurt naturalny piątnica 2%')",
     "amount": <liczba gramów jako liczba>,
     "source": "OFF" | "USDA",
     "eng_name": "krótka angielska nazwa do wyszukiwania w API, max 3 słowa"
@@ -117,11 +167,12 @@ Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
 ]
 
 Zasady:
-- source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Oreo, itp.)
+- source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Piątnica, Oreo itp.)
 - source="USDA" → surowce, warzywa, owoce, mięso, nabiał bez marki, dania domowe
-- Każdy składnik to osobny obiekt
-- amount zawsze w gramach: 1 kromka=80g, 1 plasterek=40g, 1 jajko=60g, 1 szklanka=240g, 1 łyżka=15g, 1 łyżeczka=5g, szklanka jogurtu=200g, kubek=250g
-- eng_name: krótki i konkretny np. "greek yogurt", "chicken breast", "white rice"
+- Każdy składnik to osobny obiekt w tablicy
+- amount w gramach: 1 kromka=80g, 1 plasterek=40g, 1 jajko=60g, 1 szklanka=240g, 1 łyżka=15g, 1 łyżeczka=5g, kubek=250g, porcja zupy=350g
+- eng_name: konkretny np. "natural yogurt", "chicken breast grilled", "boiled potato"
+- item: podaj możliwie pełną nazwę produktu — np. 'kotlet schabowy', 'pierogi ruskie', 'jajko sadzone'
 """
     payload = {
         "model": "llama-3.3-70b-versatile",
@@ -139,15 +190,16 @@ Zasady:
     return json.loads(raw[start:end])
 
 # ---------------------------------------------------------------
-# KROK 2 — GROQ jako fallback kalkulator (gdy API nie znajdzie)
+# GROQ — fallback kalkulator dla pojedynczego składnika
 # ---------------------------------------------------------------
 def groq_estimate_single(item_name: str, amount_g: float, api_key: str) -> dict | None:
-    """Groq szacuje makro dla jednego składnika gdy bazy zawiodły."""
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    prompt = f"""Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g.
-Zwróć TYLKO czysty JSON (bez tekstu, bez markdown):
-{{"calories": 0, "protein": 0, "fat": 0, "carbs": 0}}"""
+    prompt = (
+        f"Podaj wartości odżywcze dla: {item_name}, porcja {amount_g}g.\n"
+        f"Zwróć TYLKO czysty JSON (bez tekstu, bez markdown):\n"
+        f'{{\"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0}}'
+    )
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
@@ -165,17 +217,16 @@ Zwróć TYLKO czysty JSON (bez tekstu, bez markdown):
             "protein":  round(float(data.get("protein", 0)), 1),
             "fat":      round(float(data.get("fat", 0)), 1),
             "carbs":    round(float(data.get("carbs", 0)), 1),
-            "source_label": f"Groq~szacunek",
+            "source_label": "🤖 Groq~szacunek",
         }
     except Exception:
         return None
 
 # ---------------------------------------------------------------
-# KROK 3A — Open Food Facts (ulepszone)
+# Open Food Facts
 # ---------------------------------------------------------------
 def fetch_from_off(query: str, amount_g: float) -> dict | None:
     try:
-        # Szukaj po polsku i angielsku żeby zwiększyć szansę trafienia
         url = "https://world.openfoodfacts.org/cgi/search.pl"
         params = {
             "search_terms": query,
@@ -183,43 +234,32 @@ def fetch_from_off(query: str, amount_g: float) -> dict | None:
             "action": "process",
             "json": 1,
             "page_size": 10,
-            "sort_by": "unique_scans_n",          # najpopularniejsze produkty pierwsze
-            "fields": "product_name,nutriments,completeness",
+            "sort_by": "unique_scans_n",
+            "fields": "product_name,nutriments",
         }
         resp = requests.get(url, params=params, timeout=12)
         resp.raise_for_status()
-        data = resp.json()
-        products = data.get("products", [])
+        products = resp.json().get("products", [])
         if not products:
             return None
-
-        # Wybierz produkt z najbardziej kompletnymi danymi makro
-        best = None
-        best_score = -1
+        best, best_score = None, -1
         for p in products:
             n = p.get("nutriments", {})
             kcal_100 = n.get("energy-kcal_100g")
-
-            # Przelicz z kJ jeśli brak kcal
             if not kcal_100 and n.get("energy_100g"):
                 kcal_100 = n["energy_100g"] / 4.184
-
             if not kcal_100 or kcal_100 <= 0:
                 continue
-
-            # Sprawdź czy ma komplet makro (białko, tłuszcz, węgle)
-            has_protein = n.get("proteins_100g") is not None
-            has_fat     = n.get("fat_100g") is not None
-            has_carbs   = n.get("carbohydrates_100g") is not None
-            score = sum([has_protein, has_fat, has_carbs])
-
+            score = sum([
+                n.get("proteins_100g") is not None,
+                n.get("fat_100g") is not None,
+                n.get("carbohydrates_100g") is not None,
+            ])
             if score > best_score:
                 best_score = score
                 best = (p, n, kcal_100)
-
         if not best:
             return None
-
         p, n, kcal_100 = best
         factor = amount_g / 100
         return {
@@ -227,109 +267,82 @@ def fetch_from_off(query: str, amount_g: float) -> dict | None:
             "protein":  round((n.get("proteins_100g") or 0) * factor, 1),
             "fat":      round((n.get("fat_100g") or 0) * factor, 1),
             "carbs":    round((n.get("carbohydrates_100g") or 0) * factor, 1),
-            "source_label": f"OFF:{p.get('product_name','?')[:35]}",
+            "source_label": f"🔵 OFF: {p.get('product_name','?')[:30]}",
         }
-    except Exception as e:
+    except Exception:
         return None
 
 # ---------------------------------------------------------------
-# KROK 3B — USDA FoodData Central (ulepszone)
+# USDA FoodData Central
 # ---------------------------------------------------------------
 def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") -> dict | None:
     try:
         url = "https://api.nal.usda.gov/fdc/v1/foods/search"
-        params = {
-            "query":    eng_name,
-            "dataType": "SR Legacy,Foundation",   # tylko naturalne składniki — dokładniejsze
-            "pageSize": 5,
-            "api_key":  usda_key,
-        }
-        resp = requests.get(url, params=params, timeout=12)
-        resp.raise_for_status()
-        data = resp.json()
-        foods = data.get("foods", [])
-
-        if not foods:
-            # Drugi strzał z Branded żeby nie oddać pola
-            params["dataType"] = "Branded"
-            resp2 = requests.get(url, params=params, timeout=12)
-            foods = resp2.json().get("foods", [])
-
-        if not foods:
-            return None
-
-        # Szukaj produktu z pełnym zestawem makro
-        for food in foods:
-            nutrients = {n["nutrientName"]: n["value"] for n in food.get("foodNutrients", [])}
-
-            # USDA używa kilku nazw dla energii — sprawdź wszystkie
-            kcal = (
-                nutrients.get("Energy") or
-                nutrients.get("Energy (Atwater General Factors)") or
-                nutrients.get("Energy (Atwater Specific Factors)") or 0
-            )
-            protein = nutrients.get("Protein", 0)
-            fat     = nutrients.get("Total lipid (fat)", 0)
-            carbs   = nutrients.get("Carbohydrate, by difference", 0)
-
-            if kcal > 0:
-                factor = amount_g / 100
-                return {
-                    "calories": round(kcal * factor),
-                    "protein":  round(protein * factor, 1),
-                    "fat":      round(fat * factor, 1),
-                    "carbs":    round(carbs * factor, 1),
-                    "source_label": f"USDA:{food.get('description','?')[:35]}",
-                }
+        for data_type in ["SR Legacy,Foundation", "Branded"]:
+            params = {
+                "query":    eng_name,
+                "dataType": data_type,
+                "pageSize": 5,
+                "api_key":  usda_key,
+            }
+            resp = requests.get(url, params=params, timeout=12)
+            resp.raise_for_status()
+            foods = resp.json().get("foods", [])
+            for food in foods:
+                nutrients = {n["nutrientName"]: n["value"] for n in food.get("foodNutrients", [])}
+                kcal = (
+                    nutrients.get("Energy") or
+                    nutrients.get("Energy (Atwater General Factors)") or
+                    nutrients.get("Energy (Atwater Specific Factors)") or 0
+                )
+                if kcal > 0:
+                    factor = amount_g / 100
+                    return {
+                        "calories": round(kcal * factor),
+                        "protein":  round(nutrients.get("Protein", 0) * factor, 1),
+                        "fat":      round(nutrients.get("Total lipid (fat)", 0) * factor, 1),
+                        "carbs":    round(nutrients.get("Carbohydrate, by difference", 0) * factor, 1),
+                        "source_label": f"🟠 USDA: {food.get('description','?')[:30]}",
+                    }
         return None
     except Exception:
         return None
 
 # ---------------------------------------------------------------
-# KROK 4 — Orkiestracja
+# ORKIESTRACJA — pełny pipeline
 # ---------------------------------------------------------------
 def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
-    # KROK 1: Groq analizuje tekst i rozbija go na produkty oraz wagę
     items = classify_with_groq(food_description, api_key)
 
     total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
-    sources_used = []
+    sources_used   = []
     fallback_items = []
 
     for item in items:
-        name_ai = item.get("item", "").lower()
-        amount = float(item.get("amount", 100))
-        eng_name = item.get("eng_name", "")
-        
-        result = None
-        
-        # KROK 2: SZUKANIE W TWOIM PLIKU database.py
-        # Sprawdzamy czy nazwa z AI pasuje do jakiegokolwiek klucza w Twojej bazie
-        match_key = None
-        for key in MY_FOOD_DB.keys():
-            if key in name_ai or name_ai in key:
-                match_key = key
-                break
-        
-        if match_key:
-            db_val = MY_FOOD_DB[match_key]
-            factor = amount / 100
-            result = {
-                "calories": round(db_val["kcal"] * factor),
-                "protein":  round(db_val["p"] * factor, 1),
-                "fat":      round(db_val["f"] * factor, 1),
-                "carbs":    round(db_val["c"] * factor, 1),
-                "source_label": f"🏠 MOJA BAZA ({match_key})"
-            }
+        name_ai  = item.get("item", "").lower()
+        amount   = float(item.get("amount", 100))
+        source   = item.get("source", "USDA")
+        eng_name = item.get("eng_name", name_ai)
 
-        # KROK 3: JEŚLI NIE MA W TWOJEJ BAZIE -> SZUKAJ W API
+        result = None
+
+        # 1️⃣ Własna baza — zawsze pierwsza
+        result = lookup_in_db(name_ai, amount)
+
+        # 2️⃣ API zewnętrzne — tylko gdy brak w bazie
         if not result:
-            result = fetch_from_off(name_ai, amount)
-            if not result:
+            if source == "OFF":
+                result = fetch_from_off(name_ai, amount)
+                if not result:
+                    result = fetch_from_usda(eng_name, amount, usda_key)
+            else:
                 result = fetch_from_usda(eng_name, amount, usda_key)
-            if not result:
-                # Ostateczny ratunek - szacowanie AI
-                result = groq_estimate_single(name_ai, amount, api_key)
+                if not result:
+                    result = fetch_from_off(name_ai, amount)
+
+        # 3️⃣ Ostateczny fallback — Groq szacuje
+        if not result:
+            result = groq_estimate_single(name_ai, amount, api_key)
 
         if result:
             total["calories"] += result["calories"]
@@ -338,25 +351,17 @@ def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> 
             total["carbs"]    += result["carbs"]
             sources_used.append(f"{name_ai} ({amount:.0f}g) → {result['source_label']}")
         else:
-            fallback_items.append(f"{name_ai} — brak danych")
+            fallback_items.append(f"{name_ai} ({amount:.0f}g) — brak danych")
 
     return {
-        "name": food_description[:60],
-        "calories": total["calories"],
-        "protein": round(total["protein"], 1),
-        "fat": round(total["fat"], 1),
-        "carbs": round(total["carbs"], 1),
+        "name":         food_description[:60],
+        "calories":     total["calories"],
+        "protein":      round(total["protein"], 1),
+        "fat":          round(total["fat"], 1),
+        "carbs":        round(total["carbs"], 1),
         "sources_used": sources_used,
-        "fallback": fallback_items,
+        "fallback":     fallback_items,
     }
-
-# ---------------------------------------------------------------
-# POMOCNICZE
-# ---------------------------------------------------------------
-def detect_bread(text: str) -> bool:
-    return any(kw in text.lower() for kw in [
-        "chleb z otrębami", "chleb otręby", "chleb twarogowy", "chleb własny", "mój chleb"
-    ])
 
 # ---------------------------------------------------------------
 # STYLIZACJA
@@ -394,7 +399,6 @@ total_p    = sum(m.get("protein", 0) for m in today_meals)
 total_f    = sum(m.get("fat", 0) for m in today_meals)
 total_c    = sum(m.get("carbs", 0) for m in today_meals)
 
-# STATYSTYKI
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1: st.markdown(f'<div class="stat-box"><div class="stat-value">{total_kcal}</div><div class="stat-label">Kcal</div></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stat-box"><div class="stat-value" style="color:#6b8e23">{total_p:.0f}g</div><div class="stat-label">Białko</div></div>', unsafe_allow_html=True)
@@ -411,11 +415,11 @@ with st.sidebar:
     api_key  = st.secrets.get("GROQ_API_KEY", "") or st.text_input("Klucz Groq API", type="password")
     usda_key = st.secrets.get("USDA_API_KEY", "DEMO_KEY")
     st.markdown("---")
-    st.markdown("**Źródła danych (w kolejności):**")
-    st.markdown("1️⃣ **Groq** — klasyfikacja + fallback")
-    st.markdown("2️⃣ **Open Food Facts** — produkty markowe")
-    st.markdown("3️⃣ **USDA** — surowce i dania")
-    st.markdown("🍞 **Własna baza** — chleb z otrębami")
+    st.markdown("**Źródła danych (kolejność):**")
+    st.markdown("1️⃣ 🏠 **Moja baza** — database.py")
+    st.markdown("2️⃣ 🔵 **Open Food Facts** — marki")
+    st.markdown("3️⃣ 🟠 **USDA** — surowce")
+    st.markdown("4️⃣ 🤖 **Groq** — ostateczny fallback")
     st.markdown("---")
     st.markdown("**Arkusz:** Dziennik Kalorii")
     if st.button("🔄 Odśwież dane"):
@@ -428,7 +432,7 @@ with st.form("meal_form", clear_on_submit=True):
     with col_in:
         food_input = st.text_input(
             "Co dziś zjadłaś?",
-            placeholder="np. jogurt Danone 150g, 2 jajka, chleb z otrębami 80g…"
+            placeholder="np. jogurt piątnica 150g, 2 jajka sadzone, pierogi ruskie 200g…"
         )
     with col_sel:
         meal_time = st.selectbox("Pora", ["Śniadanie","II Śniadanie","Obiad","Kolacja","Przekąska"])
@@ -437,45 +441,28 @@ with st.form("meal_form", clear_on_submit=True):
 if submitted and food_input:
     with st.spinner("🔍 Analizuję składniki…"):
         try:
-            if detect_bread(food_input):
-                m_g = re.search(r"(\d+)\s*g", food_input.lower())
-                g = int(m_g.group(1)) if m_g else 80
-                new_meal = {
-                    "name":     f"🍞 Chleb własny ({g}g)",
-                    "calories": round(BREAD_VALS["kcal"] * g / 100),
-                    "protein":  round(BREAD_VALS["protein"] * g / 100, 1),
-                    "fat":      round(BREAD_VALS["fat"] * g / 100, 1),
-                    "carbs":    round(BREAD_VALS["carbs"] * g / 100, 1),
-                    "time":     meal_time,
-                }
-                save_meal(new_meal)
-                st.cache_resource.clear()
-                st.success(f"✅ {new_meal['name']} — **{new_meal['calories']} kcal** (dane własne)")
-                st.rerun()
-            else:
-                result = get_nutrition_hybrid(food_input, api_key, usda_key)
-                new_meal = {
-                    "name":     result["name"],
-                    "calories": result["calories"],
-                    "protein":  result["protein"],
-                    "fat":      result["fat"],
-                    "carbs":    result["carbs"],
-                    "time":     meal_time,
-                }
-                save_meal(new_meal)
-                st.cache_resource.clear()
-                st.success(
-                    f"✅ **{result['name']}** — "
-                    f"**{result['calories']} kcal** | "
-                    f"B:{result['protein']:.0f}g T:{result['fat']:.0f}g W:{result['carbs']:.0f}g"
-                )
-                with st.expander("🔍 Skąd pobrano dane? (kliknij żeby sprawdzić)"):
-                    for s in result["sources_used"]:
-                        icon = "🟠" if "USDA" in s else ("🔵" if "OFF" in s else "🟢")
-                        st.caption(f"{icon} {s}")
-                    for f_item in result["fallback"]:
-                        st.caption(f"⚠️ {f_item}")
-                st.rerun()
+            result = get_nutrition_hybrid(food_input, api_key, usda_key)
+            new_meal = {
+                "name":     result["name"],
+                "calories": result["calories"],
+                "protein":  result["protein"],
+                "fat":      result["fat"],
+                "carbs":    result["carbs"],
+                "time":     meal_time,
+            }
+            save_meal(new_meal)
+            st.cache_resource.clear()
+            st.success(
+                f"✅ **{result['name']}** — "
+                f"**{result['calories']} kcal** | "
+                f"B:{result['protein']:.0f}g T:{result['fat']:.0f}g W:{result['carbs']:.0f}g"
+            )
+            with st.expander("🔍 Skąd pobrano dane?"):
+                for s in result["sources_used"]:
+                    st.caption(f"✔ {s}")
+                for f_item in result["fallback"]:
+                    st.caption(f"⚠️ {f_item}")
+            st.rerun()
         except Exception as e:
             st.error(f"Błąd: {e}")
 
