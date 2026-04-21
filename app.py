@@ -426,10 +426,87 @@ def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") 
         return None
 
 # ---------------------------------------------------------------
+# PARSOWANIE LOKALNE — bez AI, dla znanych produktów
+# ---------------------------------------------------------------
+
+# Słowa kluczowe → nazwa w bazie
+KEYWORD_MAP = {
+    "mój chleb":        "chleb z otrębami",
+    "mojego chleba":    "chleb z otrębami",
+    "moje chleba":      "chleb z otrębami",
+    "chleb twarogowy":  "chleb z otrębami",
+    "chleba twarogowego": "chleb z otrębami",
+    "chlebie twarogowym": "chleb z otrębami",
+    "chleb własny":     "chleb z otrębami",
+    "chleb domowy":     "chleb z otrębami",
+    "chleb z otrębami": "chleb z otrębami",
+    "finuu klasyczne":  "finuu klasyczne",
+    "finuu lekkie":     "finuu lekkie",
+    "finuu":            "finuu klasyczne",
+    "jajko sadzone":    "jajko sadzone",
+    "jajka sadzone":    "jajko sadzone",
+    "jajko kurze":      "jajko kurze",
+    "jajko":            "jajko kurze",
+    "jajka":            "jajko kurze",
+    "skyr":             "skyr naturalny",
+    "piątnica 2%":      "jogurt naturalny piątnica 2%",
+    "piątnica 0%":      "jogurt naturalny piątnica 0%",
+    "piątnica":         "jogurt naturalny piątnica 2%",
+    "twaróg":           "twaróg półtłusty",
+    "masło":            "masło ekstra",
+    "kawa":             "kawa czarna",
+    "herbata":          "herbata",
+    "mleko":            "mleko 2%",
+}
+
+def parse_locally(food_description: str) -> list | None:
+    """
+    Próbuje rozpoznać składniki bez Gemini.
+    Zwraca listę itemów lub None jeśli nie rozpozna wszystkiego.
+    """
+    text = food_description.lower().strip()
+    found = []
+
+    # Wyciągnij liczbę z początku (np. "2 jajka" → 2)
+    def extract_count(text):
+        m = re.match(r"^(\d+)\s+", text)
+        return int(m.group(1)) if m else 1
+
+    # Sprawdź każde słowo kluczowe
+    matched_any = False
+    remaining = text
+
+    # Sortuj od najdłuższego do najkrótszego żeby "jajko sadzone" trafiło przed "jajko"
+    for keyword in sorted(KEYWORD_MAP.keys(), key=len, reverse=True):
+        if keyword in remaining:
+            db_name = KEYWORD_MAP[keyword]
+            portion = DEFAULT_PORTIONS.get(db_name, 100)
+            # Sprawdź czy jest liczba przed słowem kluczowym
+            pattern = r"(\d+)\s*(?:kromk[aię]|sztuk[aię]|szt\.?)?" + re.escape(keyword)
+            m = re.search(pattern, remaining)
+            count = int(m.group(1)) if m else 1
+            amount = portion * count
+            found.append({
+                "item": db_name,
+                "amount": amount,
+                "source": "LOCAL",
+                "eng_name": db_name,
+            })
+            remaining = remaining.replace(keyword, "", 1).strip()
+            matched_any = True
+
+    return found if matched_any else None
+
+
+# ---------------------------------------------------------------
 # ORKIESTRACJA — pełny pipeline
 # ---------------------------------------------------------------
 def get_nutrition_hybrid(food_description: str, api_key: str, usda_key: str) -> dict:
-    items = classify_with_gemini(food_description, api_key)
+    # Najpierw spróbuj lokalnie (szybko, bez AI, bezbłędnie)
+    items = parse_locally(food_description)
+    if not items:
+        # Fallback na Gemini gdy lokalne parsowanie nic nie znalazło
+        items = classify_with_gemini(food_description, api_key)
 
     total = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
     sources_used   = []
