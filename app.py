@@ -326,15 +326,14 @@ def lookup_in_db(db_key: str, amount_g: float) -> dict | None:
     if not v:
         return None
     
-    # 🔥 KRYTYCZNA POPRAWKA: Twoja baza jest na 100g
-    # Dla 2 kromek (160g): 160/100 = 1.6
-    f = amount_g / 100  # to daje 1.6 dla 160g
+    # Oblicz mnożnik - baza jest na 100g
+    multiplier = amount_g / 100.0
     
     return {
-        "calories": round(v["kcal"] * f),
-        "protein":  round(v["p"] * f, 1),
-        "fat":      round(v["f"] * f, 1),
-        "carbs":    round(v["c"] * f, 1),
+        "calories": int(round(v["kcal"] * multiplier)),
+        "protein": round(v["p"] * multiplier, 1),
+        "fat": round(v["f"] * multiplier, 1),
+        "carbs": round(v["c"] * multiplier, 1),
         "source_label": f"🏠 Moja baza ({db_key})",
     }
 
