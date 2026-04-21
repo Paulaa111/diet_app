@@ -226,53 +226,73 @@ def _gemini_post(payload: dict, api_key: str, timeout: int = 30) -> dict:
 # ---------------------------------------------------------------
 # GEMINI — klasyfikacja składników
 # ---------------------------------------------------------------
+
+# Słownik domyślnych porcji — nadpisuje wartości z Gemini dla znanych produktów
+# Zapobiega halucynacjom AI w gramaturach (np. "800g kromki chleba")
+DEFAULT_PORTIONS = {
+    "chleb z otrębami":               80,   # 1 kromka
+    "mój chleb":                      80,
+    "chleb twarogowy":                80,
+    "chleb własny":                   80,
+    "chleb żytni":                    80,
+    "bułka pszenna":                 100,
+    "finuu klasyczne":                10,   # 1 łyżeczka do smarowania
+    "finuu lekkie":                   10,
+    "masło ekstra":                   10,
+    "oliwa z oliwek":                 10,
+    "jajko kurze":                    60,   # 1 sztuka
+    "jajko sadzone":                  60,
+    "jogurt naturalny piątnica 2%":  150,
+    "jogurt naturalny piątnica 0%":  150,
+    "skyr naturalny":                150,
+    "twaróg półtłusty":              100,
+    "mleko 2%":                      200,
+    "kawa czarna":                   150,
+    "herbata":                       200,
+}
+
 def classify_with_gemini(food_description: str, api_key: str) -> list:
-    prompt = f"""Jesteś ekspertem ds. żywienia. Dostajesz opis posiłku po polsku.
-Zwróć TYLKO czysty JSON (tablica, bez żadnego tekstu przed/po, bez markdown):
-[
-  {{
-    "item": "polska nazwa produktu (jak najbardziej szczegółowa)",
-    "amount": <liczba gramów — TYLKO liczba, bez tekstu>,
-    "source": "OFF lub USDA",
-    "eng_name": "krótka angielska nazwa, max 3 słowa"
-  }}
-]
-
-Zasady:
-- source="OFF"  → produkty z konkretną marką (Danone, Zott, Activia, Piątnica, Finuu, Oreo itp.)
-- source="USDA" → surowce, warzywa, owoce, mięso, nabiał bez marki, dania domowe
-- Każdy składnik to OSOBNY obiekt w tablicy
-- amount ZAWSZE jako CZYSTA LICZBA CAŁKOWITA (np. 80, nie "80g", nie "80 g"):
-    1 kromka = 80
-    1 plasterek = 40
-    1 jajko = 60
-    1 łyżka = 15
-    1 łyżeczka = 5
-    1 szklanka = 240
-    kubek = 250
-    porcja zupy = 350
-    filiżanka kawy = 150
-    porcja finuu/masła = 10 (1 łyżeczka do smarowania)
-- NIE sumuj składników w jeden obiekt — każdy produkt osobno
-- eng_name: konkretny np. "natural yogurt", "chicken breast", "boiled potato"
-
-SPECJALNE MAPOWANIA — zawsze używaj dokładnie tej nazwy w polu "item":
-- "mój chleb", "kromka mojego chleba", "chleb twarogowy", "chleb własny", "chleb domowy" → item = "chleb z otrębami"
-- "finuu", "margaryna finuu" → item = "finuu klasyczne" (chyba że napisano "lekkie" → "finuu lekkie")
-- "jajko", "jajka", "jajeczko" (bez przymiotnika) → item = "jajko kurze"
-- "jajko sadzone", "jajka sadzone" → item = "jajko sadzone"
-
-Opis posiłku: {food_description}"""
+    prompt = (
+        "Jesteś ekspertem ds. żywienia. Analizujesz opis posiłku po polsku.\n"
+        "Zwróć TYLKO czysty JSON — tablicę obiektów, zero tekstu przed/po, zero markdown.\n\n"
+        'Format: [{"item": "nazwa", "amount": 100, "source": "USDA", "eng_name": "name"}]\n\n'
+        "KRYTYCZNE — pole \"amount\":\n"
+        "- WYŁĄCZNIE liczba całkowita (gramy), zakres 5-500\n"
+        '- NIE pisz jednostek: 80 TAK, "80g" NIE\n'
+        "- 1 kromka chleba=80, 1 jajko=60, 1 lyzka=15, 1 lyzeczka=10,\n"
+        "  1 szklanka=240, kubek=250, porcja zupy=350, jogurt kubeczek=150,\n"
+        "  smarowanie chleba margaryną/masłem/finuu=10\n\n"
+        "Zasady:\n"
+        '- source="OFF" → markowe (Danone, Piątnica, Finuu, Zott, Oreo)\n'
+        '- source="USDA" → surowce, warzywa, mięso, dania domowe\n'
+        "- Kazdy skladnik = osobny obiekt\n"
+        "- eng_name: po angielsku, max 3 slowa\n\n"
+        "Mapowania nazw (uzyj DOKLADNIE tej nazwy w item):\n"
+        '- moj chleb/chleb domowy/chleb twarogowy/chleb wlasny → "chleb z otrębami"\n'
+        '- finuu/margaryna finuu → "finuu klasyczne" (lub "finuu lekkie")\n'
+        '- jajko/jajka/jajeczko → "jajko kurze"\n'
+        '- jajko sadzone → "jajko sadzone"\n\n'
+        f"Opis posilku: {food_description}"
+    )
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512},
+        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 512},
     }
     raw_json = _gemini_post(payload, api_key)
     raw = raw_json["candidates"][0]["content"]["parts"][0]["text"].strip()
     raw = raw.replace("```json", "").replace("```", "").strip()
     start, end = raw.find("["), raw.rfind("]") + 1
-    return json.loads(raw[start:end])
+    items_list = json.loads(raw[start:end])
+
+    # Nadpisz amount domyślną porcją dla znanych produktów
+    # (zabezpieczenie przed halucynacjami Gemini w gramaturach)
+    for it in items_list:
+        name_l = it.get("item", "").lower().strip()
+        if name_l in DEFAULT_PORTIONS:
+            it["amount"] = DEFAULT_PORTIONS[name_l]
+
+    return items_list
 
 # ---------------------------------------------------------------
 # GEMINI — fallback kalkulator dla pojedynczego składnika
