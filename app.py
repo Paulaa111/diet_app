@@ -309,7 +309,16 @@ def fetch_from_usda(eng_name: str, amount_g: float, usda_key: str = "DEMO_KEY") 
             resp.raise_for_status()
             foods = resp.json().get("foods", [])
             for food in foods:
-                nutrients = {n["nutrientName"]: n["value"] for n in food.get("foodNutrients", [])}
+                # Bezpieczne budowanie słownika — pomijamy wpisy bez nazwy lub z wartością niebędącą liczbą
+                nutrients = {}
+                for n in food.get("foodNutrients", []):
+                    if not isinstance(n, dict):
+                        continue
+                    name = n.get("nutrientName")
+                    value = n.get("value")
+                    if name and isinstance(value, (int, float)):
+                        nutrients[name] = value
+
                 kcal = (
                     nutrients.get("Energy") or
                     nutrients.get("Energy (Atwater General Factors)") or
