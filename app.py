@@ -36,10 +36,10 @@ def load_data():
                 "date": str(r.get("Data", "")),
                 "time": str(r.get("Pora", "")),
                 "name": str(r.get("Nazwa", "")),
-                "calories": int(r.get("Kalorie", 0) or 0),
-                "protein": float(r.get("Białko", 0) or 0),
-                "fat": float(r.get("Tłuszcz", 0) or 0),
-                "carbs": float(r.get("Węglowodany", 0) or 0),
+                "calories": int(float(str(r.get("Kalorie", 0) or 0).replace(",", "."))),
+                "protein":  float(str(r.get("Białko", 0) or 0).replace(",", ".")),
+                "fat":      float(str(r.get("Tłuszcz", 0) or 0).replace(",", ".")),
+                "carbs":    float(str(r.get("Węglowodany", 0) or 0).replace(",", ".")),
                 "suma_dnia": r.get("Suma dnia", ""),
                 "_row": idx + 2,
             })
@@ -61,7 +61,7 @@ def save_meal(meal_dict):
             round(meal_dict.get("fat", 0), 1),
             round(meal_dict.get("carbs", 0), 1),
             "",
-        ], value_input_option="USER_ENTERED")
+        ], value_input_option="RAW")
     except Exception as e:
         st.error(f"❌ Nie udało się zapisać: {e}")
 
