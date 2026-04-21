@@ -326,8 +326,10 @@ def lookup_in_db(db_key: str, amount_g: float) -> dict | None:
     if not v:
         return None
     
-    # WAŻNE: Zakładamy że wartości w bazie są na 100g
-    f = amount_g / 100
+    # 🔥 KRYTYCZNA POPRAWKA: Twoja baza jest na 100g
+    # Dla 2 kromek (160g): 160/100 = 1.6
+    f = amount_g / 100  # to daje 1.6 dla 160g
+    
     return {
         "calories": round(v["kcal"] * f),
         "protein":  round(v["p"] * f, 1),
