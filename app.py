@@ -351,27 +351,58 @@ def gemini_estimate(items: list[str], api_key: str) -> list[dict]:
     """
     Wysyła listę nieznanych składników do Gemini.
     Zwraca listę słowników z kaloriami i makro.
+    Naprawiona wersja: jawne przykłady żeby Gemini nie mylił porcji z wartościami na 100g.
     """
     if not items:
         return []
-    prompt = (
-        "Jesteś dietetykiem. Podaj wartości odżywcze dla każdego składnika.\n"
-        "Zwróć TYLKO czysty JSON — tablicę, zero tekstu, zero markdown.\n"
-        'Format: [{"item":"nazwa","grams":100,"calories":0,"protein":0,"fat":0,"carbs":0}]\n\n'
-        "ZASADY:\n"
-        "- grams = gramatura porcji którą podał użytkownik\n"
-        "- Jeśli brak gramatury: użyj typowej polskiej porcji\n"
-        "- calories/protein/fat/carbs = wartości dla podanej gramatury (NIE na 100g)\n"
-        "- Każdy składnik = osobny obiekt\n\n"
-        "Składniki:\n" +
-        "\n".join(f"- {it}" for it in items)
-    )
+
+    items_text = "\n".join(f"- {it}" for it in items)
+
+    prompt = f"""Jesteś polskim dietetykiem. Oblicz wartości odżywcze dla podanych składników.
+
+ZWRÓĆ TYLKO czysty JSON — tablicę obiektów. Zero tekstu przed/po. Zero markdown.
+
+Format każdego obiektu:
+{{"item": "poprawna nazwa produktu", "grams": 150, "calories": 375, "protein": 12.0, "fat": 14.0, "carbs": 48.0}}
+
+KRYTYCZNE ZASADY:
+1. "grams" = rzeczywista gramatura porcji z opisu (np. "2 kawałki pizzy" = 2 × 125g = 250g)
+2. "calories/protein/fat/carbs" = wartości dla TEJ gramatury, NIE na 100g
+3. Jeśli brak gramatury — użyj typowej polskiej porcji
+4. Popraw literówki w nazwach (np. "pizyy" = "pizza")
+5. Każdy składnik = osobny obiekt w tablicy
+
+PRZYKŁAD:
+Wejście: "2 kawałki pizzy margherita"
+Wyjście: [{{"item": "pizza margherita", "grams": 250, "calories": 625, "protein": 22.0, "fat": 22.5, "carbs": 80.0}}]
+
+WERYFIKACJA: calories musi być > 50 dla każdej normalnej porcji jedzenia.
+
+Składniki do obliczenia:
+{items_text}"""
+
     try:
         raw  = _gemini_post(prompt, api_key)
         raw  = raw.replace("```json","").replace("```","").strip()
         s, e = raw.find("["), raw.rfind("]") + 1
         data = json.loads(raw[s:e])
-        return data
+
+        # Walidacja — odrzuć wyniki z absurdalnie małymi kaloriami
+        validated = []
+        for item in data:
+            kcal  = float(item.get("calories", 0))
+            grams = float(item.get("grams", 100))
+            # Jeśli kalorie < 10 a gramatura > 50g — prawdopodobnie Gemini dał wartości na 1g zamiast porcję
+            if kcal < 10 and grams > 50:
+                # Przemnóż przez gramaturę (zakładamy że dał na 100g)
+                factor = grams / 100
+                item["calories"] = round(kcal * factor * 100)  # kcal było na 100g
+                item["protein"]  = round(float(item.get("protein", 0)) * factor * 100, 1)
+                item["fat"]      = round(float(item.get("fat", 0)) * factor * 100, 1)
+                item["carbs"]    = round(float(item.get("carbs", 0)) * factor * 100, 1)
+            validated.append(item)
+
+        return validated
     except Exception as e:
         st.warning(f"⚠️ Gemini: {e}")
         return []
