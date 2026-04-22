@@ -102,15 +102,23 @@ def delete_meal_by_row(row_number):
 
 # Domyślna gramatura 1 sztuki / 1 jednostki produktu
 DEFAULT_GRAMS = {
+    # --- pieczywo ---
     "chleb z otrębami":             80,
     "chleb żytni":                  80,
     "bułka pszenna":               100,
+    "bagietka":                    100,
+    "tortilla pszenna":             60,
+    "chleb tostowy":                30,   # 1 kromka
+    # --- tłuszcze ---
     "finuu klasyczne":              10,
     "finuu lekkie":                 10,
     "masło ekstra":                 10,
     "oliwa z oliwek":               10,
+    # --- jajka ---
     "jajko kurze":                  60,
     "jajko sadzone":                60,
+    "jajko gotowane":               60,
+    # --- nabiał ---
     "jogurt naturalny piątnica 2%": 150,
     "jogurt naturalny piątnica 0%": 150,
     "jogurt zott primo":            150,
@@ -118,82 +126,175 @@ DEFAULT_GRAMS = {
     "skyr naturalny":               150,
     "twaróg półtłusty":             100,
     "mleko 2%":                     200,
+    "serek łaciaty do smarowania":   30,
+    "mozzarella":                   125,
+    # --- śniadania ---
+    "owsianka na wodzie":           250,
+    "owsianka na mleku":            250,
+    "płatki owsiane":                60,
+    "musli bez cukru":               60,
+    "granola":                       50,
+    # --- napoje ---
     "kawa czarna":                  150,
+    "kawa z mlekiem":               200,
     "herbata":                      200,
+    "herbata z miodem":             200,
+    "sok pomarańczowy":             200,
+    "koktajl owocowy (na mleku)":   300,
+    "miód":                          10,
+    # --- alkohole ---
+    "piwo jasne":                   500,
+    "wino czerwone wytrawne":       150,
+    "wino białe wytrawne":          150,
+    "wódka":                         50,
+    # --- owoce ---
     "jabłko":                       150,
     "banan":                        120,
     "pomarańcza":                   150,
-    # dania obiadowe — typowa porcja na talerzu
-    "kotlet schabowy":              170,  # 1 kotlet
+    "mandarynka":                    80,
+    "gruszka":                      150,
+    "kiwi":                          80,
+    "truskawki":                    150,
+    "borówki":                      100,
+    "maliny":                       100,
+    "jeżyny":                       100,
+    "winogrona":                    100,
+    "arbuz":                        250,
+    "melon":                        200,
+    "ananas":                       150,
+    "awokado":                      150,
+    # --- warzywa ---
+    "pomidor":                      120,
+    "ogórek":                       150,
+    "marchew":                      100,
+    "cukinia":                      150,
+    "brokuł":                       150,
+    "szpinak":                      100,
+    "cebula":                        80,
+    "papryka czerwona":             150,
+    "papryka zielona":              150,
+    "papryka marynowana":           100,
+    "kapusta biała":                150,
+    "kapusta kiszona":              100,
+    "kalafior":                     150,
+    "bakłażan":                     200,
+    "fasolka szparagowa":           150,
+    "sałata lodowa":                 80,
+    "rukola":                        50,
+    "burak":                        100,
+    "pieczarki":                    100,
+    "kukurydza konserwowa":          80,
+    "groszek konserwowy":            80,
+    # --- orzechy ---
+    "orzechy włoskie":               30,
+    "orzechy laskowe":               30,
+    "migdały":                       30,
+    "masło orzechowe":               30,
+    "nerkowce":                      30,
+    "pistacje":                      30,
+    "orzeszki ziemne":               30,
+    # --- mięso i drób ---
+    "pierś z kurczaka pieczona":    150,
+    "udko z kurczaka pieczone":     200,
+    "drumstick kurczak":            150,
+    "kurczak pieczony cały":        250,
+    "kurczak w sosie śmietanowym":  250,
+    "kotlet schabowy":              170,
     "kotlet mielony":               150,
-    "pierogi ruskie":               250,  # porcja ~5 szt
+    "stek wołowy":                  200,
+    "gulasz wieprzowy":             250,
+    "boczek wędzony":               50,
+    "boczek pieczony":              80,
+    "gołąbki w sosie pomidorowym":  300,
+    "leczo z kiełbasą":             300,
+    "dorsz pieczony":               150,
+    "ryba w panierce":              150,
+    "tuńczyk w oleju":              100,
+    "tuńczyk w wodzie":             100,
+    "łosoś pieczony":               150,
+    # --- wędliny ---
+    "szynka wieprzowa gotowana":     60,
+    "szynka drobiowa":               60,
+    "szynka konserwowa":             60,
+    "szynka parmeńska":              40,
+    "polędwica sopocka":             60,
+    "kiełbasa zwyczajna":           100,
+    "kiełbasa wiejska":             100,
+    "kiełbasa szynkowa":            100,
+    "kiełbasa krakowska sucha":      80,
+    "kiełbasa biała surowa":        120,
+    "kiełbasa biała parzona":       120,
+    "parówki z szynki":              80,
+    "parówki drobiowe":              80,
+    "kabanosy wieprzowe":            60,
+    "kaszanka":                     100,
+    "pasztet pieczony":              80,
+    # --- makarony (gotowane) ---
+    "makaron spaghetti":            200,
+    "makaron penne":                200,
+    "makaron tagliatelle":          200,
+    "makaron pełnoziarnisty":       200,
+    "makaron durum":                200,
+    "makaron jajeczny":             200,
+    "makaron ryżowy":               200,
+    # --- zupy ---
+    "rosół drobiowy":               350,
+    "zupa pomidorowa":              350,
+    "zupa pomidorowa z ryżem":      350,
+    "żurek":                        350,
+    "barszcz czerwony":             300,
+    "barszcz biały":                300,
+    "zupa jarzynowa":               350,
+    "zupa grzybowa":                350,
+    "zupa grochowa":                350,
+    "zupa ogórkowa":                350,
+    "zupa kapuśniak":               350,
+    "zupa fasolowa":                350,
+    "krupnik":                      350,
+    "zupa cebulowa":                350,
+    # --- obiady mączne ---
+    "pierogi ruskie":               250,
     "pierogi z mięsem":             250,
     "pierogi z owocami":            250,
     "kopytka":                      200,
     "naleśniki z serem":            200,
     "naleśniki z dżemem":           200,
+    "placuszki z cukinii":          200,
     "placki ziemniaczane":          200,
-    "gołąbki w sosie pomidorowym":  300,  # 2 gołąbki
-    "gulasz wieprzowy":             250,
-    "pizza margherita":             200,  # 2 kawałki ~100g każdy
+    "pizza margherita":             200,
     "pizza pepperoni":              200,
+    # --- dodatki ---
     "ziemniaki gotowane":           200,
     "ziemniaki z masłem":           200,
     "puree ziemniaczane":           200,
+    "ziemniaki opiekane":           200,
     "frytki":                       150,
     "ryż biały":                    150,
     "ryż brązowy":                  150,
     "kasza gryczana":               150,
     "kasza pęczak":                 150,
-    "makaron":                      200,
     "kuskus":                       150,
-    "ziemniaki opiekane":           200,
-    # mięso i drób
-    "pierś z kurczaka pieczona":    150,
-    "kurczak w sosie śmietanowym":  250,
-    "stek wołowy":                  200,
-    "dorsz pieczony":               150,
-    "ryba w panierce":              150,
-    "leczo z kiełbasą":             300,
-    # kiełbasy
-    "kiełbasa zwyczajna":           100,
-    "kiełbasa wiejska":             100,
-    "kiełbasa szynkowa":            100,
-    "kiełbasa krakowska sucha":     80,
-    "kiełbasa biała parzona":       100,
-    "parówki drobiowe":             80,
-    "parówki z szynki":             80,
-    "kabanosy wieprzowe":           60,
-    "kaszanka":                     100,
-    "pasztet pieczony":             80,
-    # orzechy i inne
-    "orzechy włoskie":              30,
-    "orzechy laskowe":              30,
-    "migdały":                      30,
-    "masło orzechowe":              30,
-    "awokado":                      150,
-    "szpinak":                      100,
-    "cukinia":                      150,
-    "pomidor":                      120,
-    "ogórek":                       150,
-    "marchew":                      100,
-    "brokuł":                       150,
-    # napoje
-    "sok pomarańczowy":             200,
-    "piwo jasne":                   500,
-    "wino czerwone wytrawne":       150,
-    "wino białe wytrawne":          150,
-    "wódka":                        50,
-    # zupy
-    "zupa pomidorowa":              350,
-    "rosół":                        350,
-    "żurek":                        350,
-    "barszcz":                      300,
+    # --- przekąski i słodycze ---
+    "batonik proteinowy":            60,
+    "czekolada mleczna":             40,
+    "czekolada gorzka":              40,
+    # --- ciasta i desery ---
+    "kremówka":                     100,
+    "wuzetka":                      100,
+    "szarlotka":                    120,
+    "ciastko kruche":                30,
+    "biszkopty":                     50,
+    # --- lody ---
+    "lody waniliowe":                80,
+    "lody czekoladowe":              80,
+    "lody truskawkowe":              80,
+    "lody owocowe sorbetowe":        80,
+    "drumstick lody":               100,
 }
 
 # Wszystkie warianty nazw → klucz w MY_FOOD_DB
 ALIASES = {
-    # chleb
+    # --- chleb ---
     "chleb z otrębami":           "chleb z otrębami",
     "chleb z otrebami":           "chleb z otrębami",
     "mój chleb":                  "chleb z otrębami",
@@ -207,7 +308,16 @@ ALIASES = {
     "chleb wlasny":               "chleb z otrębami",
     "chleb domowy":               "chleb z otrębami",
     "chleb":                      "chleb z otrębami",
-    # tłuszcze
+    "chleb żytni":                "chleb żytni",
+    "chleb zytni":                "chleb żytni",
+    "bułka":                      "bułka pszenna",
+    "bulka":                      "bułka pszenna",
+    "bagietka":                   "bagietka",
+    "tortilla":                   "tortilla pszenna",
+    "tost":                       "chleb tostowy",
+    "tosty":                      "chleb tostowy",
+    "chleb tostowy":              "chleb tostowy",
+    # --- tłuszcze ---
     "finuu klasyczne":            "finuu klasyczne",
     "finuu lekkie":               "finuu lekkie",
     "finuu":                      "finuu klasyczne",
@@ -217,15 +327,17 @@ ALIASES = {
     "maslo":                      "masło ekstra",
     "oliwa z oliwek":             "oliwa z oliwek",
     "oliwa":                      "oliwa z oliwek",
-    # jajka
+    # --- jajka ---
     "jajko sadzone":              "jajko sadzone",
     "jajka sadzone":              "jajko sadzone",
+    "jajko gotowane":             "jajko gotowane",
+    "jajka gotowane":             "jajko gotowane",
     "jajko kurze":                "jajko kurze",
     "jajka kurze":                "jajko kurze",
     "jajko":                      "jajko kurze",
     "jajka":                      "jajko kurze",
     "jajeczko":                   "jajko kurze",
-    # nabiał
+    # --- nabiał ---
     "jogurt naturalny piątnica 2%": "jogurt naturalny piątnica 2%",
     "jogurt naturalny piątnica 0%": "jogurt naturalny piątnica 0%",
     "jogurt piątnica 2%":           "jogurt naturalny piątnica 2%",
@@ -237,6 +349,7 @@ ALIASES = {
     "piątnica":                     "jogurt naturalny piątnica 2%",
     "piatnica":                     "jogurt naturalny piątnica 2%",
     "jogurt zott":                  "jogurt zott primo",
+    "zott primo":                   "jogurt zott primo",
     "zott":                         "jogurt zott primo",
     "jogurt danone":                "jogurt danone łagodny",
     "danone":                       "jogurt danone łagodny",
@@ -248,74 +361,67 @@ ALIASES = {
     "twarog":                       "twaróg półtłusty",
     "mleko 2%":                     "mleko 2%",
     "mleko":                        "mleko 2%",
-    # napoje
+    "serek łaciaty":                "serek łaciaty do smarowania",
+    "serek laciaty":                "serek łaciaty do smarowania",
+    "serek":                        "serek łaciaty do smarowania",
+    "mozzarella":                   "mozzarella",
+    # --- śniadania ---
+    "owsianka na wodzie":           "owsianka na wodzie",
+    "owsianka na mleku":            "owsianka na mleku",
+    "owsianka":                     "owsianka na mleku",
+    "płatki owsiane":               "płatki owsiane",
+    "platki owsiane":               "płatki owsiane",
+    "płatki":                       "płatki owsiane",
+    "platki":                       "płatki owsiane",
+    "musli bez cukru":              "musli bez cukru",
+    "musli":                        "musli bez cukru",
+    "müsli":                        "musli bez cukru",
+    "granola":                      "granola",
+    # --- napoje ---
     "kawa czarna":                  "kawa czarna",
+    "kawa z mlekiem":               "kawa z mlekiem",
     "kawa":                         "kawa czarna",
     "herbata":                      "herbata",
-    # owoce
+    "herbata z miodem":             "herbata z miodem",
+    "miód":                         "miód",
+    "miod":                         "miód",
+    "sok pomarańczowy":             "sok pomarańczowy",
+    "sok pomaranczowy":             "sok pomarańczowy",
+    "sok":                          "sok pomarańczowy",
+    "koktajl owocowy":              "koktajl owocowy (na mleku)",
+    "koktajl":                      "koktajl owocowy (na mleku)",
+    # --- alkohole ---
+    "piwo jasne":                   "piwo jasne",
+    "piwo":                         "piwo jasne",
+    "wino czerwone wytrawne":       "wino czerwone wytrawne",
+    "wino czerwone":                "wino czerwone wytrawne",
+    "wino białe wytrawne":          "wino białe wytrawne",
+    "wino białe":                   "wino białe wytrawne",
+    "wino biale":                   "wino białe wytrawne",
+    "wino":                         "wino czerwone wytrawne",
+    "wódka":                        "wódka",
+    "wodka":                        "wódka",
+    # --- owoce ---
     "jabłko":                       "jabłko",
     "jablko":                       "jabłko",
     "banan":                        "banan",
     "pomarańcza":                   "pomarańcza",
     "pomarancza":                   "pomarańcza",
+    "mandarynka":                   "mandarynka",
+    "gruszka":                      "gruszka",
+    "kiwi":                         "kiwi",
     "truskawki":                    "truskawki",
     "borówki":                      "borówki",
     "borowki":                      "borówki",
-    # ziemniaki — różne formy
-    "ziemniaki z masłem":           "ziemniaki z masłem",
-    "ziemniaki z maslem":           "ziemniaki z masłem",
-    "ziemniaków z masłem":          "ziemniaki z masłem",
-    "ziemniakow z maslem":          "ziemniaki z masłem",
-    "ziemniaki opiekane":           "ziemniaki opiekane",
-    "ziemniaki gotowane":           "ziemniaki gotowane",
-    "puree":                        "puree ziemniaczane",
-    "frytki":                       "frytki",
-    # mięso i drób
-    "pierś z kurczaka":             "pierś z kurczaka pieczona",
-    "piers z kurczaka":             "pierś z kurczaka pieczona",
-    "kurczak w sosie":              "kurczak w sosie śmietanowym",
-    "stek":                         "stek wołowy",
-    "dorsz":                        "dorsz pieczony",
-    "ryba w panierce":              "ryba w panierce",
-    "leczo":                        "leczo z kiełbasą",
-    # kiełbasy
-    "kiełbasa zwyczajna":           "kiełbasa zwyczajna",
-    "kielbasaw zwyczajna":          "kiełbasa zwyczajna",
-    "kiełbasa wiejska":             "kiełbasa wiejska",
-    "kiełbasa szynkowa":            "kiełbasa szynkowa",
-    "kiełbasa krakowska":           "kiełbasa krakowska sucha",
-    "kielbasa krakowska":           "kiełbasa krakowska sucha",
-    "kiełbasa biała":               "kiełbasa biała parzona",
-    "kielbasa biala":               "kiełbasa biała parzona",
-    "parówki z szynki":             "parówki z szynki",
-    "parowki z szynki":             "parówki z szynki",
-    "parówki drobiowe":             "parówki drobiowe",
-    "parowki drobiowe":             "parówki drobiowe",
-    "parówki":                      "parówki drobiowe",
-    "parowki":                      "parówki drobiowe",
-    "kabanosy":                     "kabanosy wieprzowe",
-    "kaszanka":                     "kaszanka",
-    "pasztet":                      "pasztet pieczony",
-    # orzechy
-    "orzechy włoskie":              "orzechy włoskie",
-    "orzechy wloskie":              "orzechy włoskie",
-    "orzechy laskowe":              "orzechy laskowe",
-    "migdały":                      "migdały",
-    "migdaly":                      "migdały",
-    "masło orzechowe":              "masło orzechowe",
-    "maslo orzechowe":              "masło orzechowe",
-    # napoje i alkohole
-    "sok pomarańczowy":             "sok pomarańczowy",
-    "sok pomaranczowy":             "sok pomarańczowy",
-    "sok":                          "sok pomarańczowy",
-    "koktajl":                      "koktajl owocowy (na mleku)",
-    "piwo":                         "piwo jasne",
-    "wino czerwone":                "wino czerwone wytrawne",
-    "wino białe":                   "wino białe wytrawne",
-    "wino":                         "wino czerwone wytrawne",
-    "wódka":                        "wódka",
-    "wodka":                        "wódka",
-    # warzywa
+    "maliny":                       "maliny",
+    "jeżyny":                       "jeżyny",
+    "jezyny":                       "jeżyny",
+    "winogrona":                    "winogrona",
+    "arbuz":                        "arbuz",
+    "melon":                        "melon",
+    "ananas":                       "ananas",
+    "awokado":                      "awokado",
+    # --- warzywa ---
     "pomidor":                      "pomidor",
     "pomidora":                     "pomidor",
     "ogórek":                       "ogórek",
@@ -327,12 +433,323 @@ ALIASES = {
     "brokuł":                       "brokuł",
     "brokul":                       "brokuł",
     "szpinak":                      "szpinak",
-    "awokado":                      "awokado",
-    # pieczywo
-    "chleb żytni":                  "chleb żytni",
-    "chleb zytni":                  "chleb żytni",
-    "bułka":                        "bułka pszenna",
-    "bulka":                        "bułka pszenna",
+    "cebula":                       "cebula",
+    "papryka czerwona":             "papryka czerwona",
+    "papryka zielona":              "papryka zielona",
+    "papryka marynowana":           "papryka marynowana",
+    "papryka":                      "papryka czerwona",
+    "kapusta biała":                "kapusta biała",
+    "kapusta biala":                "kapusta biała",
+    "kapusta kiszona":              "kapusta kiszona",
+    "kapusta":                      "kapusta biała",
+    "kalafior":                     "kalafior",
+    "bakłażan":                     "bakłażan",
+    "baklażan":                     "bakłażan",
+    "fasolka szparagowa":           "fasolka szparagowa",
+    "fasolka":                      "fasolka szparagowa",
+    "sałata":                       "sałata lodowa",
+    "salata":                       "sałata lodowa",
+    "rukola":                       "rukola",
+    "burak":                        "burak",
+    "pieczarki":                    "pieczarki",
+    "pieczarka":                    "pieczarki",
+    "kukurydza":                    "kukurydza konserwowa",
+    "groszek":                      "groszek konserwowy",
+    # --- orzechy ---
+    "orzechy włoskie":              "orzechy włoskie",
+    "orzechy wloskie":              "orzechy włoskie",
+    "orzechy laskowe":              "orzechy laskowe",
+    "migdały":                      "migdały",
+    "migdaly":                      "migdały",
+    "masło orzechowe":              "masło orzechowe",
+    "maslo orzechowe":              "masło orzechowe",
+    "nerkowce":                     "nerkowce",
+    "pistacje":                     "pistacje",
+    "orzeszki ziemne":              "orzeszki ziemne",
+    "orzeszki":                     "orzeszki ziemne",
+    # --- mięso i drób ---
+    "pierś z kurczaka pieczona":    "pierś z kurczaka pieczona",
+    "pierś z kurczaka":             "pierś z kurczaka pieczona",
+    "piers z kurczaka":             "pierś z kurczaka pieczona",
+    "udko z kurczaka pieczone":     "udko z kurczaka pieczone",
+    "udko z kurczaka":              "udko z kurczaka pieczone",
+    "udko kurczaka":                "udko z kurczaka pieczone",
+    "udko":                         "udko z kurczaka pieczone",
+    "drumstick kurczak":            "drumstick kurczak",
+    "podudzie kurczaka":            "drumstick kurczak",
+    "kurczak pieczony":             "kurczak pieczony cały",
+    "kurczak w sosie":              "kurczak w sosie śmietanowym",
+    "stek wołowy":                  "stek wołowy",
+    "stek wolowy":                  "stek wołowy",
+    "stek":                         "stek wołowy",
+    "gulasz wieprzowy":             "gulasz wieprzowy",
+    "gulasz":                       "gulasz wieprzowy",
+    "kotlet schabowy":              "kotlet schabowy",
+    "schabowy":                     "kotlet schabowy",
+    "schab":                        "kotlet schabowy",
+    "kotlet mielony":               "kotlet mielony",
+    "mielony":                      "kotlet mielony",
+    "boczek wędzony":               "boczek wędzony",
+    "boczek wedzony":               "boczek wędzony",
+    "boczek pieczony":              "boczek pieczony",
+    "boczek":                       "boczek wędzony",
+    "gołąbki w sosie pomidorowym":  "gołąbki w sosie pomidorowym",
+    "gołąbki":                      "gołąbki w sosie pomidorowym",
+    "golabki":                      "gołąbki w sosie pomidorowym",
+    "leczo z kiełbasą":             "leczo z kiełbasą",
+    "leczo":                        "leczo z kiełbasą",
+    "dorsz pieczony":               "dorsz pieczony",
+    "dorsz":                        "dorsz pieczony",
+    "ryba w panierce":              "ryba w panierce",
+    "tuńczyk w oleju":              "tuńczyk w oleju",
+    "tunczyk w oleju":              "tuńczyk w oleju",
+    "tuńczyk w wodzie":             "tuńczyk w wodzie",
+    "tunczyk w wodzie":             "tuńczyk w wodzie",
+    "tuńczyk":                      "tuńczyk w wodzie",
+    "tunczyk":                      "tuńczyk w wodzie",
+    "łosoś pieczony":               "łosoś pieczony",
+    "losos pieczony":               "łosoś pieczony",
+    "łosoś":                        "łosoś pieczony",
+    "losos":                        "łosoś pieczony",
+    # --- wędliny ---
+    "szynka wieprzowa gotowana":    "szynka wieprzowa gotowana",
+    "szynka wieprzowa":             "szynka wieprzowa gotowana",
+    "szynka drobiowa":              "szynka drobiowa",
+    "szynka konserwowa":            "szynka konserwowa",
+    "szynka parmeńska":             "szynka parmeńska",
+    "prosciutto":                   "szynka parmeńska",
+    "szynka":                       "szynka wieprzowa gotowana",
+    "polędwica sopocka":            "polędwica sopocka",
+    "poledwica sopocka":            "polędwica sopocka",
+    "polędwica":                    "polędwica sopocka",
+    "kiełbasa zwyczajna":           "kiełbasa zwyczajna",
+    "kiełbasa wiejska":             "kiełbasa wiejska",
+    "kiełbasa szynkowa":            "kiełbasa szynkowa",
+    "kiełbasa krakowska sucha":     "kiełbasa krakowska sucha",
+    "kiełbasa krakowska":           "kiełbasa krakowska sucha",
+    "kielbasa krakowska":           "kiełbasa krakowska sucha",
+    "krakowska":                    "kiełbasa krakowska sucha",
+    "kiełbasa biała surowa":        "kiełbasa biała surowa",
+    "kiełbasa biała parzona":       "kiełbasa biała parzona",
+    "kiełbasa biała":               "kiełbasa biała parzona",
+    "kielbasa biala":               "kiełbasa biała parzona",
+    "biała kiełbasa":               "kiełbasa biała parzona",
+    "kiełbasa":                     "kiełbasa zwyczajna",
+    "parówki z szynki":             "parówki z szynki",
+    "parowki z szynki":             "parówki z szynki",
+    "parówki drobiowe":             "parówki drobiowe",
+    "parowki drobiowe":             "parówki drobiowe",
+    "parówki":                      "parówki drobiowe",
+    "parowki":                      "parówki drobiowe",
+    "kabanosy wieprzowe":           "kabanosy wieprzowe",
+    "kabanosy":                     "kabanosy wieprzowe",
+    "kaszanka":                     "kaszanka",
+    "pasztet pieczony":             "pasztet pieczony",
+    "pasztet":                      "pasztet pieczony",
+    # --- makarony ---
+    "makaron spaghetti":            "makaron spaghetti",
+    "spaghetti":                    "makaron spaghetti",
+    "makaron penne":                "makaron penne",
+    "penne":                        "makaron penne",
+    "makaron tagliatelle":          "makaron tagliatelle",
+    "tagliatelle":                  "makaron tagliatelle",
+    "makaron pełnoziarnisty":       "makaron pełnoziarnisty",
+    "makaron pelnoziarnisty":       "makaron pełnoziarnisty",
+    "makaron durum":                "makaron durum",
+    "makaron jajeczny":             "makaron jajeczny",
+    "makaron ryżowy":               "makaron ryżowy",
+    "makaron ryzowy":               "makaron ryżowy",
+    "makaron":                      "makaron spaghetti",
+    # --- zupy ---
+    "rosół drobiowy":               "rosół drobiowy",
+    "rosół":                        "rosół drobiowy",
+    "rosol":                        "rosół drobiowy",
+    "zupa pomidorowa z ryżem":      "zupa pomidorowa z ryżem",
+    "zupa pomidorowa":              "zupa pomidorowa",
+    "pomidorowa":                   "zupa pomidorowa",
+    "żurek":                        "żurek",
+    "zurek":                        "żurek",
+    "barszcz czerwony":             "barszcz czerwony",
+    "barszcz biały":                "barszcz biały",
+    "barszcz bialy":                "barszcz biały",
+    "barszcz":                      "barszcz czerwony",
+    "zupa jarzynowa":               "zupa jarzynowa",
+    "jarzynowa":                    "zupa jarzynowa",
+    "zupa grzybowa":                "zupa grzybowa",
+    "grzybowa":                     "zupa grzybowa",
+    "zupa grochowa":                "zupa grochowa",
+    "grochowa":                     "zupa grochowa",
+    "zupa ogórkowa":                "zupa ogórkowa",
+    "ogórkowa":                     "zupa ogórkowa",
+    "zupa kapuśniak":               "zupa kapuśniak",
+    "kapuśniak":                    "zupa kapuśniak",
+    "kapusniak":                    "zupa kapuśniak",
+    "zupa fasolowa":                "zupa fasolowa",
+    "fasolowa":                     "zupa fasolowa",
+    "krupnik":                      "krupnik",
+    "zupa cebulowa":                "zupa cebulowa",
+    "cebulowa":                     "zupa cebulowa",
+    # --- obiady mączne ---
+    "pierogi ruskie":               "pierogi ruskie",
+    "pierogi z mięsem":             "pierogi z mięsem",
+    "pierogi z owocami":            "pierogi z owocami",
+    "pierogi":                      "pierogi ruskie",
+    "kopytka":                      "kopytka",
+    "naleśniki z serem":            "naleśniki z serem",
+    "naleśniki z dżemem":          "naleśniki z dżemem",
+    "naleśniki":                    "naleśniki z serem",
+    "nalesniki":                    "naleśniki z serem",
+    "placuszki z cukinii":          "placuszki z cukinii",
+    "placuszki":                    "placuszki z cukinii",
+    "placki ziemniaczane":          "placki ziemniaczane",
+    "placki":                       "placki ziemniaczane",
+    "pizza margherita":             "pizza margherita",
+    "pizza pepperoni":              "pizza pepperoni",
+    "pizza":                        "pizza margherita",
+    # --- dodatki ---
+    "ziemniaki z masłem":           "ziemniaki z masłem",
+    "ziemniaki z maslem":           "ziemniaki z masłem",
+    "ziemniaki opiekane":           "ziemniaki opiekane",
+    "ziemniaki gotowane":           "ziemniaki gotowane",
+    "ziemniaki":                    "ziemniaki gotowane",
+    "puree ziemniaczane":           "puree ziemniaczane",
+    "puree":                        "puree ziemniaczane",
+    "frytki":                       "frytki",
+    "ryż biały":                    "ryż biały",
+    "ryż brązowy":                  "ryż brązowy",
+    "ryż brazowy":                  "ryż brązowy",
+    "ryż":                          "ryż biały",
+    "ryz":                          "ryż biały",
+    "kasza gryczana":               "kasza gryczana",
+    "kasza pęczak":                 "kasza pęczak",
+    "kasza":                        "kasza gryczana",
+    "kuskus":                       "kuskus",
+    # --- przekąski i słodycze ---
+    "batonik proteinowy":           "batonik proteinowy",
+    "batonik":                      "batonik proteinowy",
+    "czekolada mleczna":            "czekolada mleczna",
+    "czekolada gorzka":             "czekolada gorzka",
+    "czekolada":                    "czekolada mleczna",
+    # --- ciasta i desery ---
+    "kremówka":                     "kremówka",
+    "kremowka":                     "kremówka",
+    "wuzetka":                      "wuzetka",
+    "wuzetki":                      "wuzetka",
+    "szarlotka":                    "szarlotka",
+    "ciastko kruche":               "ciastko kruche",
+    "ciastko":                      "ciastko kruche",
+    "biszkopty":                    "biszkopty",
+    "biszkopt":                     "biszkopty",
+    # --- lody ---
+    "lody waniliowe":               "lody waniliowe",
+    "lody czekoladowe":             "lody czekoladowe",
+    "lody truskawkowe":             "lody truskawkowe",
+    "lody owocowe sorbetowe":       "lody owocowe sorbetowe",
+    "sorbet":                       "lody owocowe sorbetowe",
+    "drumstick lody":               "drumstick lody",
+    "lody":                         "lody waniliowe",
+}
+
+# Odmiana przez przypadki — końcówki fleksyjne polskich słów
+POLISH_STEMS = {
+    "pizzy":              "pizza",
+    "pizy":               "pizza",
+    "pizyy":              "pizza",
+    "margarity":          "margherita",
+    "margherity":         "margherita",
+    "pepperoni":          "pepperoni",
+    "ziemniaków":         "ziemniaki",
+    "ziemniakow":         "ziemniaki",
+    "ziemniaka":          "ziemniaki",
+    "pierogów":           "pierogi ruskie",
+    "pierogow":           "pierogi ruskie",
+    "schabowego":         "kotlet schabowy",
+    "schabowe":           "kotlet schabowy",
+    "schabowy":           "kotlet schabowy",
+    "schabow":            "kotlet schabowy",
+    "schabu":             "kotlet schabowy",
+    "kotleta":            "kotlet schabowy",
+    "kotlety":            "kotlet schabowy",
+    "kotletów":           "kotlet schabowy",
+    "mielonego":          "kotlet mielony",
+    "mielone":            "kotlet mielony",
+    "gulaszu":            "gulasz wieprzowy",
+    "frytki":             "frytki",
+    "frytek":             "frytki",
+    "kopytek":            "kopytka",
+    "naleśniki":          "naleśniki z serem",
+    "naleśnik":           "naleśniki z serem",
+    "nalesniki":          "naleśniki z serem",
+    "gołąbki":            "gołąbki w sosie pomidorowym",
+    "golabki":            "gołąbki w sosie pomidorowym",
+    "gołąbka":            "gołąbki w sosie pomidorowym",
+    "golabka":            "gołąbki w sosie pomidorowym",
+    "ryżu":               "ryż biały",
+    "ryzu":               "ryż biały",
+    "makaronu":           "makaron spaghetti",
+    "kaszy":              "kasza gryczana",
+    "marchewki":          "marchew",
+    "marchewkę":          "marchew",
+    "ogórka":             "ogórek",
+    "ogorka":             "ogórek",
+    "pomidora":           "pomidor",
+    "pomidory":           "pomidor",
+    "papryki":            "papryka czerwona",
+    "cebuli":             "cebula",
+    "brokułu":            "brokuł",
+    "brokulu":            "brokuł",
+    "jabłka":             "jabłko",
+    "jablka":             "jabłko",
+    "banana":             "banan",
+    "truskawek":          "truskawki",
+    "borówek":            "borówki",
+    "borowek":            "borówki",
+    "malin":              "maliny",
+    "jeżyn":              "jeżyny",
+    "winogron":           "winogrona",
+    "kurczaka":           "pierś z kurczaka pieczona",
+    "piersi":             "pierś z kurczaka pieczona",
+    "steka":              "stek wołowy",
+    "dorsza":             "dorsz pieczony",
+    "łososia":            "łosoś pieczony",
+    "lososia":            "łosoś pieczony",
+    "tuńczyka":           "tuńczyk w wodzie",
+    "tunczyka":           "tuńczyk w wodzie",
+    "boczku":             "boczek wędzony",
+    "kiełbasę":           "kiełbasa zwyczajna",
+    "kielbasy":           "kiełbasa zwyczajna",
+    "parówek":            "parówki drobiowe",
+    "parowek":            "parówki drobiowe",
+    "kabanosów":          "kabanosy wieprzowe",
+    "kabanosow":          "kabanosy wieprzowe",
+    "pasztetu":           "pasztet pieczony",
+    "cukinii":            "cukinia",
+    "szpinaku":           "szpinak",
+    "awokado":            "awokado",
+    "orzechów":           "orzechy włoskie",
+    "orzechow":           "orzechy włoskie",
+    "migdałów":           "migdały",
+    "migdalow":           "migdały",
+    "piwa":               "piwo jasne",
+    "wina":               "wino czerwone wytrawne",
+    "wódki":              "wódka",
+    "wodki":              "wódka",
+    "owsianki":           "owsianka na mleku",
+    "płatków":            "płatki owsiane",
+    "platków":            "płatki owsiane",
+    "granoli":            "granola",
+    "musli":              "musli bez cukru",
+    "müsli":              "musli bez cukru",
+    "kawy":               "kawa czarna",
+    "herbaty":            "herbata",
+    "miodu":              "miód",
+    "soku":               "sok pomarańczowy",
+    "kremówki":           "kremówka",
+    "kremowki":           "kremówka",
+    "wuzetki":            "wuzetka",
+    "szarlotki":          "szarlotka",
+    "lodów":              "lody waniliowe",
+    "lodow":              "lody waniliowe",
 }
 
 # Przeliczniki jednostek → gramy na 1 jednostkę
@@ -351,114 +768,10 @@ UNITS = {
     "kubek":     250,   "kubki":     250,
     "porcja":    200,   "porcje":    200,  "porcji":    200,
     "talerz":    300,   "miseczka":  200,  "garść":      30,
-    "plasterek": 40,
-}
-
-# Odmiana przez przypadki — końcówki fleksyjne polskich słów
-# "pizzy" -> "pizza", "kawałki" -> już w UNITS, "ziemniaków" -> "ziemniaki"
-POLISH_STEMS = {
-    "pizzy":         "pizza",
-    "pizy":          "pizza",       # literówka
-    "pizyy":         "pizza",       # literówka
-    "margarity":     "margherita",  # literówka
-    "margherity":    "margherita",
-    "pepperoni":     "pepperoni",
-    "ziemniaków":    "ziemniaki",
-    "ziemniakow":    "ziemniaki",
-    "ziemniaka":     "ziemniaki",
-    "pierogi":       "pierogi ruskie",
-    "pierogów":      "pierogi ruskie",
-    "pierogow":      "pierogi ruskie",
-    "schabowego":    "kotlet schabowy",
-    "schabowe":      "kotlet schabowy",
-    "schabowy":      "kotlet schabowy",
-    "schabow":       "kotlet schabowy",
-    "schabu":        "schab",
-    "kotleta":       "kotlet schabowy",
-    "kotlety":       "kotlet schabowy",
-    "kotletów":      "kotlet schabowy",
-    "mielonego":     "kotlet mielony",
-    "mielone":       "kotlet mielony",
-    "gulaszu":       "gulasz wieprzowy",
-    "pieczeń":       "schab",
-    "ziemniaka":     "ziemniaki gotowane",
-    "ziemniaki":     "ziemniaki gotowane",
-    "ziemniaków":    "ziemniaki gotowane",
-    "ziemniakow":    "ziemniaki gotowane",
-    "frytki":        "frytki",
-    "frytek":        "frytki",
-    "puree":         "puree ziemniaczane",
-    "kopytka":       "kopytka",
-    "kopytek":       "kopytka",
-    "naleśniki":     "naleśniki z serem",
-    "naleśnik":      "naleśniki z serem",
-    "nalesniki":     "naleśniki z serem",
-    "pierogi":       "pierogi ruskie",
-    "pierogów":      "pierogi ruskie",
-    "pierogow":      "pierogi ruskie",
-    "gołąbki":       "gołąbki w sosie pomidorowym",
-    "golabki":       "gołąbki w sosie pomidorowym",
-    "gołąbka":       "gołąbki w sosie pomidorowym",
-    "golabka":       "gołąbki w sosie pomidorowym",
-    "ryżu":          "ryż biały",
-    "ryzu":          "ryż biały",
-    "makaronu":      "makaron",
-    "kaszy":         "kasza gryczana",
-    "marchewki":     "marchew",
-    "marchewkę":     "marchew",
-    "ogórka":        "ogórek",
-    "ogorka":        "ogórek",
-    "pomidora":      "pomidor",
-    "papryki":       "papryka",
-    "cebuli":        "cebula",
-    "brokułu":       "brokuł",
-    "brokulu":       "brokuł",
-    "jabłka":        "jabłko",
-    "jablka":        "jabłko",
-    "banana":        "banan",
-    "truskawek":     "truskawki",
-    "borówek":            "borówki",
-    "borowek":            "borówki",
-    # ziemniaki z masłem
-    "ziemniaki z masłem": "ziemniaki z masłem",
-    "ziemniaków z masłem":"ziemniaki z masłem",
-    # mięso
-    "kurczaka":           "pierś z kurczaka pieczona",
-    "piersi":             "pierś z kurczaka pieczona",
-    "steka":              "stek wołowy",
-    "dorsza":             "dorsz pieczony",
-    # kiełbasy
-    "kiełbasę":           "kiełbasa zwyczajna",
-    "kielbasy":           "kiełbasa zwyczajna",
-    "parówek":            "parówki drobiowe",
-    "parowek":            "parówki drobiowe",
-    "kabanosów":          "kabanosy wieprzowe",
-    "kabanosow":          "kabanosy wieprzowe",
-    "pasżtetu":           "pasztet pieczony",
-    "pasztetu":           "pasztet pieczony",
-    # warzywa
-    "cukinii":            "cukinia",
-    "szpinaku":           "szpinak",
-    "awokado":            "awokado",
-    "pomidora":           "pomidor",
-    "pomidory":           "pomidor",
-    # napoje
-    "piwa":               "piwo jasne",
-    "wina":               "wino czerwone wytrawne",
-    "wódki":              "wódka",
-    "wodki":              "wódka",
-    # orzechy
-    "orzechów":           "orzechy włoskie",
-    "orzechow":           "orzechy włoskie",
-    "migdałów":           "migdały",
-    "migdalow":           "migdały",
+    "gałka":      80,   "gałki":     80,   "galka":     80,
 }
 
 def normalize_polish(text: str) -> str:
-    """
-    Zamienia polskie końcówki fleksyjne na mianownik.
-    np. "2 kawałki pizzy margarity" -> "2 kawałki pizza margherita"
-    """
     words = text.split()
     result = []
     for w in words:
@@ -466,19 +779,15 @@ def normalize_polish(text: str) -> str:
     return " ".join(result)
 
 def resolve_product(raw: str) -> str | None:
-    """Zamienia surowy tekst na klucz w MY_FOOD_DB. Zwraca None jeśli nie znalazło."""
     raw = raw.strip().lower()
 
-    # 1. Bezpośrednie trafienie w bazie
     if raw in MY_FOOD_DB:
         return raw
 
-    # 2. Alias (od najdłuższego)
     for alias in sorted(ALIASES.keys(), key=len, reverse=True):
         if alias in raw:
             return ALIASES[alias]
 
-    # 3. Normalizacja polskich końcówek + ponowne próby
     normalized = normalize_polish(raw)
     if normalized != raw:
         if normalized in MY_FOOD_DB:
@@ -490,15 +799,12 @@ def resolve_product(raw: str) -> str | None:
             if key in normalized or normalized in key:
                 return key
 
-    # 4. Częściowe dopasowanie po pierwszym słowie
-    # np. "pizzy margarity" -> pierwsze słowo "pizzy" -> stem "pizza" -> szukaj kluczy zaczynających się od "pizza"
     first_word = raw.split()[0] if raw.split() else raw
     first_normalized = POLISH_STEMS.get(first_word, first_word)
     for key in sorted(MY_FOOD_DB.keys(), key=len, reverse=True):
         if key.startswith(first_normalized):
             return key
 
-    # 5. Ogólne częściowe dopasowanie
     for key in sorted(MY_FOOD_DB.keys(), key=len, reverse=True):
         if key in raw or raw in key:
             return key
@@ -506,20 +812,6 @@ def resolve_product(raw: str) -> str | None:
     return None
 
 def parse_meal_locally(text: str) -> tuple[list, list]:
-    """
-    Parsuje tekst i zwraca:
-    - found: lista (db_key, gramy) dla produktów znalezionych w bazie
-    - unknown: lista surowych tekstów których nie rozpoznano
-
-    Separator składników: przecinek LUB ' i ' LUB ' oraz '
-    Obsługuje:
-      "2 kromki chleba"          → (chleb z otrębami, 160g)
-      "łyżka finuu"              → (finuu klasyczne, 15g)
-      "150g jogurtu piątnica"    → (jogurt naturalny piątnica 2%, 150g)
-      "jajko"                    → (jajko kurze, 60g)
-      "2 kawałki pizzy"          → unknown → idzie do Gemini
-    """
-    # Podziel na składniki po separatorach
     parts = re.split(r',|\bi\b|\boraz\b', text.lower())
     parts = [p.strip() for p in parts if p.strip()]
 
@@ -531,7 +823,6 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
         grams   = None
         product = None
 
-        # Wzór A: liczba + jednostka + produkt  → "2 kromki mojego chleba"
         m = re.match(
             rf'^(\d+(?:[.,]\d+)?)\s+({unit_pat})\s+(.+)$',
             part, re.IGNORECASE | re.UNICODE
@@ -543,7 +834,6 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
             grams   = UNITS[unit] * count
             product = resolve_product(raw)
 
-        # Wzór B: liczba + "g"/"ml" bezpośrednio (np. "150g jogurtu")
         if not product:
             m = re.match(
                 r'^(\d+(?:[.,]\d+)?)\s*(g|ml|dag|kg)\s+(.+)$',
@@ -556,7 +846,6 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
                 grams   = UNITS[unit] * count
                 product = resolve_product(raw)
 
-        # Wzór C: jednostka (bez liczby) + produkt  → "łyżka finuu"
         if not product:
             m = re.match(
                 rf'^({unit_pat})\s+(.+)$',
@@ -568,7 +857,6 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
                 grams   = UNITS[unit] * 1
                 product = resolve_product(raw)
 
-        # Wzór D: liczba + produkt (bez jednostki)  → "2 jajka", "3 jabłka"
         if not product:
             m = re.match(r'^(\d+)\s+(.+)$', part, re.IGNORECASE | re.UNICODE)
             if m:
@@ -579,7 +867,6 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
                     unit_g = DEFAULT_GRAMS.get(product, 100)
                     grams  = unit_g * count
 
-        # Wzór E: sam produkt (bez liczby i jednostki)  → "finuu", "jajko"
         if not product:
             product = resolve_product(part)
             if product:
@@ -621,11 +908,6 @@ def _gemini_post(prompt: str, api_key: str, max_tokens: int = 512) -> str:
     raise Exception(f"Gemini niedostępne: {last_err}")
 
 def gemini_estimate(items: list[str], api_key: str) -> list[dict]:
-    """
-    Wysyła listę nieznanych składników do Gemini.
-    Zwraca listę słowników z kaloriami i makro.
-    Naprawiona wersja: jawne przykłady żeby Gemini nie mylił porcji z wartościami na 100g.
-    """
     if not items:
         return []
 
@@ -660,16 +942,13 @@ Składniki do obliczenia:
         s, e = raw.find("["), raw.rfind("]") + 1
         data = json.loads(raw[s:e])
 
-        # Walidacja — odrzuć wyniki z absurdalnie małymi kaloriami
         validated = []
         for item in data:
             kcal  = float(item.get("calories", 0))
             grams = float(item.get("grams", 100))
-            # Jeśli kalorie < 10 a gramatura > 50g — prawdopodobnie Gemini dał wartości na 1g zamiast porcję
             if kcal < 10 and grams > 50:
-                # Przemnóż przez gramaturę (zakładamy że dał na 100g)
                 factor = grams / 100
-                item["calories"] = round(kcal * factor * 100)  # kcal było na 100g
+                item["calories"] = round(kcal * factor * 100)
                 item["protein"]  = round(float(item.get("protein", 0)) * factor * 100, 1)
                 item["fat"]      = round(float(item.get("fat", 0)) * factor * 100, 1)
                 item["carbs"]    = round(float(item.get("carbs", 0)) * factor * 100, 1)
@@ -729,7 +1008,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Jak wpisywać:**")
     st.markdown("Oddzielaj składniki **przecinkiem** lub **' i '**")
-    st.markdown("```\n2 kromki chleba, łyżka finuu\njajko sadzone, 150g jogurtu piątnica\n2 kawałki pizzy margherita\n```")
+    st.markdown("```\n2 kromki chleba, łyżka finuu\nowsianka na mleku, banan\n3 kawałki łososia\n```")
     st.markdown("---")
     st.markdown("**Źródła:**")
     st.markdown("1️⃣ 🏠 Moja baza — szybko i dokładnie")
@@ -742,7 +1021,7 @@ with st.sidebar:
 with st.form("meal_form", clear_on_submit=True):
     food_input = st.text_input(
         "Co dziś zjadłaś?",
-        placeholder="np. 2 kromki chleba, łyżka finuu, jajko sadzone"
+        placeholder="np. owsianka na mleku, banan, łyżka miodu"
     )
     meal_time = st.selectbox("Pora", ["Śniadanie","II Śniadanie","Obiad","Kolacja","Przekąska"])
     submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
@@ -750,13 +1029,11 @@ with st.form("meal_form", clear_on_submit=True):
 if submitted and food_input:
     with st.spinner("🔍 Analizuję…"):
 
-        # KROK 1: Parsuj lokalnie
         found, unknown = parse_meal_locally(food_input)
 
         total   = {"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
         details = []
 
-        # KROK 2: Policz kalorie z bazy lokalnej
         for db_key, grams in found:
             v = MY_FOOD_DB[db_key]
             f = grams / 100
@@ -770,7 +1047,6 @@ if submitted and food_input:
             total["carbs"]    += c
             details.append(f"🏠 **{db_key}** ({grams:.0f}g) → {kcal} kcal | B:{p}g T:{fat}g W:{c}g")
 
-        # KROK 3: Nieznane → Gemini
         if unknown and api_key:
             gemini_results = gemini_estimate(unknown, api_key)
             for g in gemini_results:
