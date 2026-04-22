@@ -205,7 +205,7 @@ DEFAULT_GRAMS = {
     "gulasz wieprzowy":             250,
     "boczek wędzony":               50,
     "boczek pieczony":              80,
-    "gołąbki w sosie pomidorowym":  300,
+    "gołąbki w sosie pomidorowym":  150,
     "leczo z kiełbasą":             300,
     "dorsz pieczony":               150,
     "ryba w panierce":              150,
@@ -283,7 +283,7 @@ DEFAULT_GRAMS = {
     "wuzetka":                      100,
     "szarlotka":                    120,
     "ciastko kruche":                30,
-    "biszkopty":                     50,
+    "biszkopty":                     10,
     # --- lody ---
     "lody waniliowe":                80,
     "lody czekoladowe":              80,
@@ -549,6 +549,10 @@ ALIASES = {
     "kaszanka":                     "kaszanka",
     "pasztet pieczony":             "pasztet pieczony",
     "pasztet":                      "pasztet pieczony",
+    "szynki parmeńskiej":           "szynka parmeńska",
+    "polędwicy sopockiej":          "polędwica sopocka",
+    "mozzarelli":                   "mozzarella",
+    "30g mozzarelli":               "mozzarella",
     # --- makarony ---
     "makaron spaghetti":            "makaron spaghetti",
     "spaghetti":                    "makaron spaghetti",
