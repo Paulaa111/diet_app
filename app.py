@@ -401,6 +401,9 @@ ALIASES = {
     "wino":                         "wino czerwone wytrawne",
     "wódka":                        "wódka",
     "wodka":                        "wódka",
+    "kieliszek wina białego":       "wino białe wytrawne",
+    "kieliszek wina czerwonego":    "wino czerwone wytrawne",
+    "kieliszek wina":               "wino czerwone wytrawne",
     # --- owoce ---
     "jabłko":                       "jabłko",
     "jablko":                       "jabłko",
@@ -769,6 +772,7 @@ UNITS = {
     "porcja":    200,   "porcje":    200,  "porcji":    200,
     "talerz":    300,   "miseczka":  200,  "garść":      30,
     "gałka":      80,   "gałki":     80,   "galka":     80,
+    "kieliszek":  150,   "kieliszki":  150,
 }
 
 def normalize_polish(text: str) -> str:
