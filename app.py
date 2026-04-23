@@ -321,6 +321,11 @@ ALIASES = {
     "tost":                       "chleb tostowy",
     "tosty":                      "chleb tostowy",
     "chleb tostowy":              "chleb tostowy",
+    "cukier biały":               "cukier biały",
+    "cukier":                     "cukier biały",
+    "cukru":                      "cukier biały",
+    "łyżeczka cukru":             "cukier biały",
+    "lyzeczka cukru":             "cukier biały",
     # --- tłuszcze ---
     "finuu klasyczne":            "finuu klasyczne",
     "finuu lekkie":               "finuu lekkie",
@@ -767,6 +772,8 @@ POLISH_STEMS = {
     "szarlotki":          "szarlotka",
     "lodów":              "lody waniliowe",
     "lodow":              "lody waniliowe",
+    "cukru":              "cukier biały",
+    "cukier":             "cukier biały",
 }
 
 # Przeliczniki jednostek → gramy na 1 jednostkę
