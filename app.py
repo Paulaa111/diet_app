@@ -118,6 +118,10 @@ DEFAULT_GRAMS = {
     "jajko kurze":                  60,
     "jajko sadzone":                60,
     "jajko gotowane":               60,
+    "jajecznica z 1 jajka":         60,
+    "jajecznica z 2 jajek":         120,
+    "jajecznica z 3 jajek":         180,
+    "jajecznica z 4 jajek":         240,
     # --- nabiał ---
     "jogurt naturalny piątnica 2%": 150,
     "jogurt naturalny piątnica 0%": 150,
@@ -337,6 +341,12 @@ ALIASES = {
     "jajko":                      "jajko kurze",
     "jajka":                      "jajko kurze",
     "jajeczko":                   "jajko kurze",
+    "jajecznica z 1 jajka":       "jajecznica z 1 jajka",
+    "jajecznica z 2 jajek":       "jajecznica z 2 jajek",
+    "jajecznica z 3 jajek":       "jajecznica z 3 jajek",
+    "jajecznica z 4 jajek":       "jajecznica z 4 jajek",
+    "jajecznica z 1 jajkiem":     "jajecznica z 1 jajka",
+    "jajecznica":                 "jajecznica z 2 jajek",  # domyślnie 2 jajka
     # --- nabiał ---
     "jogurt naturalny piątnica 2%": "jogurt naturalny piątnica 2%",
     "jogurt naturalny piątnica 0%": "jogurt naturalny piątnica 0%",
