@@ -215,4 +215,10 @@ MY_FOOD_DB = {
     "bagietka": {"kcal": 270, "p": 9.0, "f": 1.5, "c": 55.0},
     "tortilla pszenna": {"kcal": 300, "p": 8.0, "f": 7.0, "c": 50.0},
     "chleb tostowy": {"kcal": 265, "p": 8.5, "f": 3.5, "c": 50.0},
+
+    # --- DODATKI ---
+    "cukier biały": {"kcal": 400, "p": 0.0, "f": 0.0, "c": 100.0},
+    "cukier trzcinowy": {"kcal": 397, "p": 0.0, "f": 0.0, "c": 99.0},
+    "ksylitol": {"kcal": 240, "p": 0.0, "f": 0.0, "c": 99.0},
+    "erytrytol": {"kcal": 0, "p": 0.0, "f": 0.0, "c": 100.0},
 }
