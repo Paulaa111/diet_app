@@ -1046,9 +1046,10 @@ with st.sidebar:
         st.rerun()
 
 with st.form("meal_form", clear_on_submit=True):
-    food_input = st.text_input(
+    food_input = st.text_area(
         "Co dziś zjadłaś?",
-        placeholder="np. owsianka na mleku, banan, łyżka miodu"
+        placeholder="np. owsianka na mleku, banan, łyżka miodu",
+        height=80,
     )
     meal_time = st.selectbox("Pora", ["Śniadanie","II Śniadanie","Obiad","Kolacja","Przekąska"])
     submitted = st.form_submit_button("DODAJ POSIŁEK", use_container_width=True)
