@@ -22,10 +22,10 @@ MY_FOOD_DB = {
     "jajko kurze": {"kcal": 139, "p": 12.5, "f": 9.7, "c": 0.6},   # na 100g (~2 sztuki)
     "jajko gotowane": {"kcal": 155, "p": 13.0, "f": 11.0, "c": 1.1},
     "jajko sadzone": {"kcal": 196, "p": 13.0, "f": 15.0, "c": 0.8},
-    "jajecznica z 1 jajka":  {"kcal": 233, "p": 13.1, "f": 18.4, "c": 0.8},
-    "jajecznica z 2 jajek":  {"kcal": 466, "p": 26.2, "f": 36.8, "c": 1.6},
-    "jajecznica z 3 jajek":  {"kcal": 699, "p": 39.3, "f": 55.2, "c": 2.4},
-    "jajecznica z 4 jajek":  {"kcal": 932, "p": 52.4, "f": 73.6, "c": 3.2},
+    "jajecznica z 1 jajka":  {"kcal": 388, "p": 21.8, "f": 30.7, "c": 1.3},
+    "jajecznica z 2 jajek":  {"kcal": 388, "p": 21.8, "f": 30.7, "c": 1.3},
+    "jajecznica z 3 jajek":  {"kcal": 388, "p": 21.8, "f": 30.7, "c": 1.3},
+    "jajecznica z 4 jajek":  {"kcal": 388, "p": 21.8, "f": 30.7, "c": 1.3},
 
     # --- ŚNIADANIA ---
     "owsianka na wodzie": {"kcal": 68, "p": 2.4, "f": 1.4, "c": 12.0},   # gotowana
