@@ -167,6 +167,7 @@ DEFAULT_GRAMS = {
     "melon":                        200,
     "ananas":                       150,
     "awokado":                      150,
+    "daktyle suszone":              10,   
     # --- warzywa ---
     "pomidor":                      120,
     "ogórek":                       150,
@@ -485,6 +486,10 @@ ALIASES = {
     "pistacje":                     "pistacje",
     "orzeszki ziemne":              "orzeszki ziemne",
     "orzeszki":                     "orzeszki ziemne",
+    "daktyle suszone":              "daktyle suszone",
+    "daktyle":                      "daktyle suszone",
+    "daktyl":                       "daktyle suszone",
+    "daktyli":                      "daktyle suszone",
     # --- mięso i drób ---
     "pierś z kurczaka pieczona":    "pierś z kurczaka pieczona",
     "pierś z kurczaka":             "pierś z kurczaka pieczona",
@@ -696,6 +701,8 @@ POLISH_STEMS = {
     "mielonego":          "kotlet mielony",
     "mielone":            "kotlet mielony",
     "gulaszu":            "gulasz wieprzowy",
+    "daktyli":            "daktyle suszone",
+    "daktyla":            "daktyle suszone",
     "frytki":             "frytki",
     "frytek":             "frytki",
     "kopytek":            "kopytka",
