@@ -774,6 +774,8 @@ POLISH_STEMS = {
     "lodow":              "lody waniliowe",
     "cukru":              "cukier biały",
     "cukier":             "cukier biały",
+    "kawę":               "kawa czarna",
+    "kawy":               "kawa czarna",
 }
 
 # Przeliczniki jednostek → gramy na 1 jednostkę
