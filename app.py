@@ -839,7 +839,7 @@ def resolve_product(raw: str) -> str | None:
     return None
 
 def parse_meal_locally(text: str) -> tuple[list, list]:
-    parts = re.split(r',|\bi\b|\boraz\b', text.lower())
+    parts = re.split(r',|\boraz\b', text.lower())
     parts = [p.strip() for p in parts if p.strip()]
 
     found   = []
