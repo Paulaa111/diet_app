@@ -104,6 +104,7 @@ def delete_meal_by_row(row_number):
 DEFAULT_GRAMS = {
     # --- pieczywo ---
     "chleb z otrębami":             50,
+    "chleb twarogowy":              40,
     "chleb żytni":                  80,
     "bułka pszenna":               100,
     "bagietka":                    100,
@@ -302,6 +303,7 @@ ALIASES = {
     # --- chleb ---
     "chleb z otrębami":           "chleb z otrębami",
     "chleb z otrebami":           "chleb z otrębami",
+    "chleb twarogowy":            "chleb twarogowy",
     "mój chleb":                  "chleb z otrębami",
     "moj chleb":                  "chleb z otrębami",
     "mojego chleba":              "chleb z otrębami",
