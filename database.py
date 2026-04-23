@@ -199,7 +199,7 @@ MY_FOOD_DB = {
     "melon": {"kcal": 34, "p": 0.8, "f": 0.2, "c": 8.0},
     "maliny": {"kcal": 52, "p": 1.2, "f": 0.7, "c": 12.0},
     "jeżyny": {"kcal": 43, "p": 1.4, "f": 0.5, "c": 10.0},
-    "daktyle suszone": {"kcal": 267, "p": 2.0, "f": 0.3, "c": 67.0}
+    "daktyle suszone": {"kcal": 267, "p": 2.0, "f": 0.3, "c": 67.0},
 
     # --- ORZECHY ---
     "orzechy włoskie": {"kcal": 654, "p": 15.0, "f": 65.0, "c": 14.0},
