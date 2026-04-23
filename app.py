@@ -767,7 +767,7 @@ UNITS = {
     "kg":       1000,
     "łyżeczka":    5,   "łyżeczki":   5,   "lyżeczka":   5,
     "łyżka":      15,   "łyżki":     15,   "lyżka":     15,   "łyżek":     15,
-    "kromka":     80,   "kromki":    80,   "kromek":    80,
+    "kromka":     40,   "kromki":    40,   "kromek":    40,
     "plasterek":  40,   "plasterki": 40,   "plasterków": 40,
     "kawałek":    80,   "kawałki":   80,   "kawalek":   80,
     "sztuka":     60,   "sztuki":    60,   "sztuk":     60,   "szt":       60,
