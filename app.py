@@ -103,8 +103,7 @@ def delete_meal_by_row(row_number):
 # Domyślna gramatura 1 sztuki / 1 jednostki produktu
 DEFAULT_GRAMS = {
     # --- pieczywo ---
-    "chleb z otrębami":             50,
-    "chleb twarogowy":              40,
+    "chleb twarogowy":              50,
     "chleb żytni":                  80,
     "bułka pszenna":               100,
     "bagietka":                    100,
