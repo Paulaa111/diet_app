@@ -839,8 +839,8 @@ def resolve_product(raw: str) -> str | None:
     return None
 
 def parse_meal_locally(text: str) -> tuple[list, list]:
-    parts = re.split(r',|\boraz\b', text.lower())
-    parts = [p.strip() for p in parts if p.strip()]
+    # Dziel tylko po przecinku
+    parts = [p.strip() for p in text.lower().split(',') if p.strip()]
 
     found   = []
     unknown = []
@@ -850,6 +850,7 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
         grams   = None
         product = None
 
+        # "2 łyżki finuu", "3 kromki chleba"
         m = re.match(
             rf'^(\d+(?:[.,]\d+)?)\s+({unit_pat})\s+(.+)$',
             part, re.IGNORECASE | re.UNICODE
@@ -861,6 +862,7 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
             grams   = UNITS[unit] * count
             product = resolve_product(raw)
 
+        # "100g kurczaka"
         if not product:
             m = re.match(
                 r'^(\d+(?:[.,]\d+)?)\s*(g|ml|dag|kg)\s+(.+)$',
@@ -873,6 +875,7 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
                 grams   = UNITS[unit] * count
                 product = resolve_product(raw)
 
+        # "łyżka finuu", "szklanka mleka"
         if not product:
             m = re.match(
                 rf'^({unit_pat})\s+(.+)$',
@@ -884,6 +887,7 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
                 grams   = UNITS[unit] * 1
                 product = resolve_product(raw)
 
+        # "2 jajka", "3 kromki"
         if not product:
             m = re.match(r'^(\d+)\s+(.+)$', part, re.IGNORECASE | re.UNICODE)
             if m:
@@ -894,6 +898,7 @@ def parse_meal_locally(text: str) -> tuple[list, list]:
                     unit_g = DEFAULT_GRAMS.get(product, 100)
                     grams  = unit_g * count
 
+        # sama nazwa produktu
         if not product:
             product = resolve_product(part)
             if product:
