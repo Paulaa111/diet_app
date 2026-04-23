@@ -301,20 +301,7 @@ DEFAULT_GRAMS = {
 # Wszystkie warianty nazw → klucz w MY_FOOD_DB
 ALIASES = {
     # --- chleb ---
-    "chleb z otrębami":           "chleb z otrębami",
-    "chleb z otrebami":           "chleb z otrębami",
     "chleb twarogowy":            "chleb twarogowy",
-    "mój chleb":                  "chleb z otrębami",
-    "moj chleb":                  "chleb z otrębami",
-    "mojego chleba":              "chleb z otrębami",
-    "chleba mojego":              "chleb z otrębami",
-    "moje chleba":                "chleb z otrębami",
-    "chleb twarogowy":            "chleb z otrębami",
-    "chleba twarogowego":         "chleb z otrębami",
-    "chleb własny":               "chleb z otrębami",
-    "chleb wlasny":               "chleb z otrębami",
-    "chleb domowy":               "chleb z otrębami",
-    "chleb":                      "chleb z otrębami",
     "chleb żytni":                "chleb żytni",
     "chleb zytni":                "chleb żytni",
     "bułka":                      "bułka pszenna",
